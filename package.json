@@ -1,0 +1,40 @@
+{
+  "name": "proyecto-resort-soa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hotel Resort Bahia Azul: servicio Clientes y arquitectura SOA de cuatro servicios",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "setup:dev": "node scripts/setup-dev.mjs",
+    "start": "node --env-file=.env services/clientes/src/server.js",
+    "dev": "node --env-file=.env --watch services/clientes/src/server.js",
+    "db:migrate": "node --env-file=.env services/clientes/src/migrate.js",
+    "test": "node --test --test-concurrency=1 services/clientes/test/*.test.js",
+    "test:coverage": "node --test --test-concurrency=1 --experimental-test-coverage services/clientes/test/*.test.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "contracts:check": "node scripts/check-contracts.mjs",
+    "check": "pnpm lint && pnpm format:check && pnpm contracts:check && pnpm test"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9"
+  }
+}

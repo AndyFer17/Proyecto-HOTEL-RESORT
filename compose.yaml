@@ -1,0 +1,62 @@
+services:
+  clientes-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: clientes
+      POSTGRES_DB: clientes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ejecuta pnpm setup:dev}
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - clientes-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U clientes -d clientes']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  clientes-migrate:
+    build:
+      context: .
+      dockerfile: services/clientes/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://clientes:${POSTGRES_PASSWORD}@clientes-db:5432/clientes
+    command: ['node', 'services/clientes/src/migrate.js']
+    depends_on:
+      clientes-db:
+        condition: service_healthy
+  clientes:
+    build:
+      context: .
+      dockerfile: services/clientes/Dockerfile
+    init: true
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: postgresql://clientes:${POSTGRES_PASSWORD}@clientes-db:5432/clientes
+      JWT_PRIVATE_KEY_BASE64: ${JWT_PRIVATE_KEY_BASE64:?Ejecuta pnpm setup:dev}
+      JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Ejecuta pnpm setup:dev}
+      JWT_ISSUER: resort-clientes
+      JWT_AUDIENCE: resort-api
+      JWT_TTL_SECONDS: 900
+    ports:
+      - '127.0.0.1:3001:3001'
+    depends_on:
+      clientes-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+volumes:
+  clientes-data:
