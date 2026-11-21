@@ -1,0 +1,634 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Hotel Resort - Habitaciones",
+    "version": "0.1.0",
+    "description": "BORRADOR: contrato preliminar. Servicio NO implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3002",
+      "description": "Desarrollo local - puerto futuro"
+    }
+  ],
+  "paths": {
+    "/api/v1/habitaciones/disponibilidad": {
+      "get": {
+        "summary": "Consultar habitaciones disponibles",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "habitaciones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "habitacionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "numero": {
+                            "type": "string"
+                          },
+                          "tipo": {
+                            "type": "string"
+                          },
+                          "capacidad": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "tarifaNoche": {
+                            "type": "string",
+                            "pattern": "^\\d{1,10}\\.\\d{2}$",
+                            "example": "660.00"
+                          },
+                          "moneda": {
+                            "type": "string",
+                            "enum": ["PEN"]
+                          }
+                        },
+                        "required": [
+                          "habitacionId",
+                          "numero",
+                          "tipo",
+                          "capacidad",
+                          "tarifaNoche",
+                          "moneda"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["habitaciones"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "personas",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/habitaciones/{id}": {
+      "get": {
+        "summary": "Consultar habitación",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "habitacionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "numero": {
+                      "type": "string"
+                    },
+                    "tipo": {
+                      "type": "string"
+                    },
+                    "capacidad": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "tarifaNoche": {
+                      "type": "string",
+                      "pattern": "^\\d{1,10}\\.\\d{2}$",
+                      "example": "660.00"
+                    },
+                    "moneda": {
+                      "type": "string",
+                      "enum": ["PEN"]
+                    }
+                  },
+                  "required": [
+                    "habitacionId",
+                    "numero",
+                    "tipo",
+                    "capacidad",
+                    "tarifaNoche",
+                    "moneda"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/interno/bloqueos": {
+      "post": {
+        "summary": "Reservas solicita bloqueo temporal",
+        "responses": {
+          "201": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "bloqueoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "habitacionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "hasta": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "venceEn": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "total": {
+                      "type": "string",
+                      "pattern": "^\\d{1,10}\\.\\d{2}$",
+                      "example": "660.00"
+                    },
+                    "moneda": {
+                      "type": "string",
+                      "enum": ["PEN"]
+                    }
+                  },
+                  "required": [
+                    "bloqueoId",
+                    "habitacionId",
+                    "desde",
+                    "hasta",
+                    "venceEn",
+                    "total",
+                    "moneda"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Bloqueo atómico con expiración definida por servidor. Clave idempotente y control de solapamientos obligatorios.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "reservaId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "habitacionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "desde": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hasta": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "personas": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "reservaId",
+                  "habitacionId",
+                  "desde",
+                  "hasta",
+                  "personas"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/interno/bloqueos/{id}/confirmacion": {
+      "put": {
+        "summary": "Confirmar ocupación",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "bloqueoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": ["CONFIRMADO"]
+                    }
+                  },
+                  "required": ["bloqueoId", "estado"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/interno/bloqueos/{id}": {
+      "delete": {
+        "summary": "Liberar bloqueo u ocupación por compensación/cancelación",
+        "responses": {
+          "204": {
+            "description": "Resultado correcto"
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Solo Reservas; conservar historial y liberar inventario de forma idempotente.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["codigo", "mensaje", "detalle", "traceId"]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      },
+      "serviceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token de identidad de servicio, emisión y scopes pendientes de acordar."
+      }
+    }
+  }
+}
