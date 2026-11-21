@@ -29,7 +29,7 @@ El registro informa 409 si el correo existe; esto permite enumeración de correo
 - No se habilita CORS para un frontend inexistente. Al construirlo, definir explícitamente orígenes permitidos.
 - El contenedor de aplicación corre como usuario `node`, con sistema de archivos de solo lectura y sin privilegios nuevos.
 - Compose separa propietario de migraciones y rol de aplicación en cada una de cuatro bases. Solo el migrador recibe credenciales del propietario; el runtime recibe permisos de datos sobre su esquema y no privilegios de superusuario ni DDL.
-- No hay verificación de correo, MFA, cuentas de empleados, auditoría persistente, backups ni alertas. Son ampliaciones pendientes.
+- Pagos conserva auditoría persistente de cargos, pagos, bloqueos de cuenta y avisos. No hay un sistema centralizado e inmutable de auditoría de todos los servicios; esa ampliación, verificación de correo, MFA, cuentas de empleados, backups y alertas siguen pendientes.
 
 ## ADR 005 — Pruebas portables y CI
 
@@ -47,10 +47,12 @@ Pagos requiere `ALLOW_SIMULATED_PROVIDERS=true` y rechaza arrancar en producció
 
 Reservas persiste operación, fase e idempotencia antes de coordinar HTTP. Los workers pueden reintentar después de reiniciar y la API devuelve 202 mientras falta completar una coordinación. Una llamada que agota timeout puede haber terminado: no se la trata como inexistente ni se duplica con otra identidad.
 
-La confirmación y su evento se conservan en la misma transacción local. La entrega del aviso se realiza fuera de esa transacción con una clave estable. Esto permite recuperación sin mantener una transacción SQL abierta durante llamadas HTTP; no promete entrega exactamente una vez a un proveedor real.
+La confirmación y su evento se conservan en la misma transacción local. La entrega del aviso se realiza fuera de esa transacción con una clave estable. El coordinador de Reservas puede recuperarse sin mantener una transacción SQL abierta durante sus llamadas HTTP; no promete entrega exactamente una vez a un proveedor real. Pagos sí revalida por API el estado de la reserva bajo el lock local de la cuenta antes de un pago nuevo, con timeout acotado; ese lock no es una transacción distribuida y una dependencia caída revierte el intento local. El replay de un resultado ya persistido no necesita esa consulta remota.
 
 ## ADR 008 — Gateway y entorno local
 
 Nginx enruta las APIs públicas y oculta rutas internas. Todos los puertos publicados son loopback y las redes de base se separan por dominio. La demo usa HTTP local; TLS y certificados se terminan en un proxy de confianza antes de cualquier exposición remota. No se configura `trust proxy` indiscriminadamente: el limitador de Clientes detrás del Gateway comparte la IP del proxy y sigue siendo una limitación académica en memoria.
+
+Se utilizan bridges independientes con publicación en loopback, en lugar de redes marcadas `internal`, para permitir smoke y desarrollo desde el host. Se conserva la separación de dominios, sin prometer bloqueo de salida a Internet. Referencia: [redes de Docker Compose](https://docs.docker.com/compose/how-tos/networking/#internal-networks).
 
 El lanzador local filtra el entorno por servicio. Los verificadores no heredan la clave de firma ni secretos de los otros dominios; Compose también entrega credenciales explícitas por proceso. `.env` no se incorpora a las imágenes y el setup nunca imprime sus valores.

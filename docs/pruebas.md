@@ -8,11 +8,17 @@
 
 El propio script `scripts/smoke.mjs` también pasó con cuatro aplicaciones HTTP y workers sobre PGlite, desactivando el Gateway en ese entorno. Las pruebas de Docker, Nginx, roles de ejecución y PostgreSQL por TCP se verifican por separado en GitHub Actions. Consultar la ejecución del commit que se entregue.
 
+## Verificación en GitHub Actions
+
+La [ejecución 44874530708](https://github.com/AndyFer17/Proyecto-HOTEL-RESORT/actions/runs/44874530708) terminó correctamente para el commit `3bd15fc520b4ffd0f8709905f7f3e410c6a153b5`: **79 pruebas aprobadas** con cuatro PostgreSQL 17 por TCP, auditoría sin vulnerabilidades conocidas, setup y configuración Compose válidos, construcción de imágenes, migraciones, arranque de las cuatro APIs con sus roles de aplicación y Gateway Nginx. El smoke completo pasó a través del Gateway y la limpieza final también terminó correctamente.
+
+La primera ejecución detectó un problema de publicación de puertos al marcar todas las redes como `internal`. Se corrigió utilizando bridges separados por dominio y manteniendo los bindings en `127.0.0.1`; la ejecución citada comprueba ese cambio. Los errores de unicidad y exclusión que aparecen en logs de las bases de pruebas corresponden a escenarios negativos esperados y no a fallos de las suites.
+
 ## Qué debe verificarse
 
 El repositorio contiene suites por servicio, integración HTTP y un smoke sobre procesos activos. Los escenarios definidos y la existencia de CI no son prueba de una ejecución exitosa. Al entregar, registrar fecha, commit y resultados reales del entorno utilizado.
 
-Validación local del 21 de noviembre de 2026: el script smoke completó su flujo sobre cuatro aplicaciones HTTP reales con cuatro bases PGlite y sus workers. También se verificaron sintaxis YAML, separación de credenciales y redes declaradas, scripts de la colección Postman y setup idempotente con regeneración explícita. Estas comprobaciones no ejecutaron Nginx, Docker Compose ni PostgreSQL por TCP, que requieren una ejecución separada de Docker/CI. El resultado global de las suites y la auditoría debe registrarse desde la comprobación final de la rama.
+Validación local adicional del 21 de noviembre de 2026: se verificaron sintaxis YAML, separación de credenciales y redes declaradas, scripts de la colección Postman y setup idempotente con regeneración explícita. Estas comprobaciones locales son distintas de la ejecución Docker/PostgreSQL registrada arriba.
 
 ```sh
 pnpm install --frozen-lockfile

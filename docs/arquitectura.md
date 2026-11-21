@@ -35,7 +35,7 @@ REST/JSON, `/api/v1`, UUID, ISO 8601 y errores `{codigo,mensaje,detalle,traceId}
 
 Las llamadas internas usan un Bearer de servicio compartido, distinto del JWT de huésped. Se conserva `traceId` entre saltos sin imprimir tokens. Cada API tiene un usuario SQL sin privilegios de propietario; el script de migraciones conserva los privilegios DDL fuera del proceso que atiende peticiones.
 
-Las operaciones mutables requieren idempotencia según su contrato. Una misma clave y contenido reproduce la operación; contenido diferente produce 409. El precio se obtiene de Habitaciones y no del cliente. No se mantiene una transacción SQL abierta mientras se espera HTTP de otro servicio.
+Las operaciones mutables requieren idempotencia según su contrato. Una misma clave y contenido reproduce un resultado persistido; contenido diferente produce 409. Los rechazos anteriores a un efecto o al registro durable no necesariamente vinculan la clave. El precio se obtiene de Habitaciones y no del cliente. El coordinador de Reservas confirma cada fase local antes de esperar HTTP; Pagos revalida el estado de una reserva bajo el lock de su cuenta al procesar un pago nuevo, con timeout acotado, sin compartir una transacción entre bases.
 
 ## Política elegida para la demo
 
