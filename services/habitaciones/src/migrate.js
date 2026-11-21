@@ -1,28 +1,10 @@
-import { readdir, readFile } from 'node:fs/promises';
 import { createPool } from './database.js';
+import { migrateFiles } from '../../shared/database.js';
 
 const dir = new URL('../migrations/', import.meta.url);
 
 export async function migrate(db) {
-  const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
-  for (const file of files) {
-    const sql = await readFile(new URL(file, dir), 'utf8');
-    if (typeof db.connect === 'function') {
-      // Una unica conexion para mantener BEGIN/COMMIT en la misma sesion.
-      const client = await db.connect();
-      try {
-        await client.query(sql);
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
-    } else {
-      await db.exec(sql);
-    }
-  }
-  return files.length;
+  return migrateFiles(db, dir);
 }
 
 if (

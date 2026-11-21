@@ -1,85 +1,82 @@
 # Arquitectura SOA del Hotel Resort
 
-## Estado actual y objetivo
+## Componentes implementados y límites
 
-Solo Clientes se ejecuta en esta versión. Los otros tres servicios tienen responsabilidades y contratos preliminares. El repositorio agrupa el código del equipo, pero cada servicio debe tener su proceso, sus reglas y la propiedad de sus datos. Usar un monorepositorio no significa mezclar las bases ni la lógica.
+El monorepositorio contiene cuatro servicios de negocio independientes, un Gateway Nginx y utilidades compartidas de transporte y seguridad. Cada dominio tiene un proceso, una base PostgreSQL, una cuenta propietaria para migraciones y un rol de aplicación para sus datos. No hay consultas SQL ni claves foráneas entre bases.
 
 ```mermaid
 flowchart LR
-  U[Postman o futuro portal] --> C[Clientes - implementado]
+  U[Postman o cliente] --> G[Gateway]
+  G --> C[Clientes]
+  G --> H[Habitaciones]
+  G --> R[Reservas]
+  G --> P[Pagos y Notificaciones]
+  R -->|bloqueos| H
+  R -->|cargos y avisos| P
+  P -->|titular de reserva| R
   C --> DC[(BD Clientes)]
-  U -. futuro .-> G[API Gateway - pendiente]
-  G -.-> C
-  G -.-> H[Habitaciones - diseño]
-  G -.-> R[Reservas - diseño]
-  G -.-> P[Pagos y Notificaciones - diseño]
-  R -. bloqueo y liberación .-> H
-  R -. cargo de alojamiento .-> P
-  H -.-> DH[(BD Habitaciones - prevista)]
-  R -.-> DR[(BD Reservas - prevista)]
-  P -.-> DP[(BD Cuenta y Pagos - prevista)]
+  H --> DH[(BD Habitaciones)]
+  R --> DR[(BD Reservas)]
+  P --> DP[(BD Pagos)]
 ```
 
-Las líneas continuas muestran componentes existentes; las punteadas, conexiones previstas. El Gateway no contará como uno de los cuatro servicios de negocio ni contendrá reglas de reservas.
+El diagrama expresa las conexiones del código y de Compose; su validación en ejecución exige una prueba identificable. El Gateway no cuenta como servicio de negocio ni decide disponibilidad o saldos. Sus rutas públicas no exponen `/api/v1/interno`.
 
-## Límites de los servicios
+| Servicio             | Datos propios                  | Responsabilidad                                                          |
+| -------------------- | ------------------------------ | ------------------------------------------------------------------------ |
+| Clientes             | Huéspedes y credenciales       | Registro, JWT RS256, perfil propio y JWKS                                |
+| Habitaciones         | Catálogo, tarifas y bloqueos   | Disponibilidad, exclusión de rangos solapados, confirmación y liberación |
+| Reservas             | Estadías, operaciones y outbox | Propiedad, ciclo de vida, coordinación e intentos recuperables           |
+| Pagos/Notificaciones | Cargos, pagos y avisos         | Cuenta, cobro simulado, deduplicación y entrega de avisos                |
 
-| Servicio               | Datos propios                                            | Operaciones                                                      | No debe hacer                                         |
-| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| Clientes               | Huéspedes y credenciales                                 | Registrar, autenticar, consultar perfil propio                   | Gestionar reservas o saldos                           |
-| Habitaciones           | Habitaciones, tarifas, bloqueos y ocupaciones por fechas | Consultar disponibilidad, bloquear, confirmar/liberar inventario | Editar reservas o procesar cobros                     |
-| Reservas               | Estadías, fechas, estado, referencias y precio acordado  | Coordinar reserva, consultar y cancelar                          | Consultar directamente tablas de Habitaciones o Pagos |
-| Pagos / Notificaciones | Cargos, pagos y avisos                                   | Consolidar cuenta, cobrar y registrar confirmaciones             | Decidir disponibilidad o modificar estadías           |
+## Contratos y seguridad
 
-Cada base tendrá su usuario. El Compose actual crea exclusivamente la de Clientes; no contiene bases vacías que aparenten servicios implementados. Pagos y Notificaciones se agrupan por alcance académico, con módulos separados cuando se implementen.
+REST/JSON, `/api/v1`, UUID, ISO 8601 y errores `{codigo,mensaje,detalle,traceId}`. El dinero viaja como cadenas decimales y usa PEN. Clientes firma JWT RS256; Reservas y Pagos reciben únicamente la clave pública y validan emisor, audiencia, expiración y propietario. No aceptan que un `huespedId` enviado por el usuario sustituya su identidad autenticada.
 
-## Contratos comunes
+Las llamadas internas usan un Bearer de servicio compartido, distinto del JWT de huésped. Se conserva `traceId` entre saltos sin imprimir tokens. Cada API tiene un usuario SQL sin privilegios de propietario; el script de migraciones conserva los privilegios DDL fuera del proceso que atiende peticiones.
 
-- REST/JSON y prefijo `/api/v1`. UUID como identificadores, fechas ISO 8601.
-- Error uniforme: `{codigo, mensaje, detalle, traceId}`.
-- JWT RS256 de 15 minutos: `sub=clienteId`, `rol=HUESPED`, `iss=resort-clientes`, `aud=resort-api`.
-- Solo Clientes conserva la clave privada; los consumidores verifican claves públicas obtenidas de JWKS.
-- Los endpoints internos requerirán identidad de servicio. El JWT de un huésped no sustituye ese control.
-- Reservas y pagos usarán `Idempotency-Key`, persistiendo resultado y huella del cuerpo. Una misma clave con otro cuerpo debe dar 409. Esto está diseñado, no implementado en Clientes.
-- Importes propuestos como cadenas decimales (`"660.00"`) en los nuevos contratos para evitar pérdida de precisión en JSON/JavaScript. Actualizar esta convención en el informe del equipo antes de integrar.
+Las operaciones mutables requieren idempotencia según su contrato. Una misma clave y contenido reproduce un resultado persistido; contenido diferente produce 409. Los rechazos anteriores a un efecto o al registro durable no necesariamente vinculan la clave. El precio se obtiene de Habitaciones y no del cliente. El coordinador de Reservas confirma cada fase local antes de esperar HTTP; Pagos revalida el estado de una reserva bajo el lock de su cuenta al procesar un pago nuevo, con timeout acotado, sin compartir una transacción entre bases.
 
-## Flujo previsto de reserva sin anticipo
+## Política elegida para la demo
 
-Esta primera propuesta confirma la reserva con cargo pendiente y cobra al finalizar la estadía. El informe original contempla pago al reservar cuando corresponda; el equipo debe elegir y documentar una política antes de implementar Reservas.
+La reserva se confirma con un cargo de alojamiento pendiente. El huésped paga al finalizar la estadía mediante `SIMULADO`, con `tok_aprobado` o `tok_rechazado`. El rechazo conserva el saldo. La aprobación registra un pago y un aviso persistente; repetir la misma clave no realiza otro cobro.
+
+Cancelar una reserva sin pago anula su cargo y libera inventario conservando historial. Si existe un pago aprobado, la cancelación automática responde 409. Un reembolso requiere un flujo posterior explícito; no se simula que dinero ya cobrado se devuelve solo por liberar una habitación.
+
+Esta es una concreción académica de la alternativa del informe que decía cobrar “cuando corresponda”. El flujo de anticipo/autorización y reverso de una pasarela real no está implementado. Pagos exige habilitación explícita de los simuladores y rechaza `NODE_ENV=production`.
+
+## Coordinación y recuperación
 
 ```mermaid
 sequenceDiagram
-  participant U as Huésped
-  participant C as Clientes
-  participant R as Reservas (pendiente)
-  participant H as Habitaciones (pendiente)
-  participant P as Pagos/Notificaciones (pendiente)
-  U->>C: Registrar e iniciar sesión
-  C-->>U: JWT firmado
-  U->>R: Crear reserva con JWT e Idempotency-Key
-  R->>R: Validar identidad y fechas, guardar PENDIENTE
-  R->>H: Solicitar bloqueo temporal
-  H-->>R: bloqueoId y precio calculado
-  R->>H: Confirmar ocupación del bloqueo
-  H-->>R: Ocupación confirmada
-  R->>P: Registrar cargo por alojamiento (origenId único)
+  participant U as Huesped
+  participant R as Reservas
+  participant H as Habitaciones
+  participant P as Pagos y Notificaciones
+  U->>R: Crear con JWT e Idempotency-Key
+  R->>R: Persistir operacion y reserva pendiente
+  R->>H: Crear bloqueo con vencimiento
+  H-->>R: bloqueoId y total
+  R->>H: Confirmar inventario
+  R->>P: Registrar cargo unico de alojamiento
   P-->>R: cargoId
-  R->>R: Confirmar estadía y guardar evento en outbox
+  R->>R: Confirmar estadia y guardar outbox
   R-->>U: Reserva confirmada
-  R-->>P: Solicitar aviso de confirmación
+  R->>P: Encolar aviso por evento persistido
+  U->>P: Pagar cuenta al finalizar
+  P->>P: Registrar pago y aviso persistente
 ```
 
-El diagrama de secuencia es diseño, no evidencia de integración ejecutada.
+Habitaciones protege rangos `[desde,hasta)` con restricciones de PostgreSQL. Los bloqueos expiran y se liberan transaccionalmente; consultar primero y escribir después sin protección no sería suficiente. El estado operativo se conserva por separado como `EN_SERVICIO`, `LIMPIEZA` o `MANTENIMIENTO`; la disponibilidad solo incluye habitaciones en servicio. Su cambio usa un endpoint interno autorizado y rechaza retirar inventario ya comprometido.
 
-## Consistencia y fallos por resolver en la siguiente fase
+Reservas conserva operaciones y fases para reintentar dependencias tras reinicio. Si la coordinación aún no concluye puede responder 202 con `reservaId` y `operacionId`; el cliente consulta su reserva o reintenta con la misma clave. Ante un timeout no se asume que la llamada no ocurrió: los contratos internos permiten deduplicar y recuperar. Un estado que necesita intervención no se presenta como reserva completada.
 
-- Habitaciones debe evitar solapamientos dentro de una transacción. No basta consultar y luego insertar sin protección. Diseñar rangos `[entrada, salida)` para permitir salida y entrada el mismo día.
-- Si falla un paso después del bloqueo, Reservas debe recuperar su estado y liberar/compensar lo confirmado. Si ya creó el cargo, la compensación debe anularlo sin borrar su historial.
-- Si se desconoce si una llamada terminó, consultar/reintentar de forma idempotente; no asumir que un timeout implica que nada ocurrió.
-- Timeout previsto: 3 segundos por dependencia; reintentos limitados solo en operaciones seguras o idempotentes. No mantener una transacción de base abierta durante una llamada HTTP.
-- Un aviso fallido no cancela una reserva confirmada. Se reintenta con una cola/outbox persistente; no confiar en tareas solo en memoria.
-- El flujo de pago con anticipo requiere autorización/captura y reverso con una pasarela de prueba; está fuera de este primer servicio.
+La publicación del aviso se guarda en outbox junto al cambio de estado; su fallo no revierte una estadía confirmada. Pagos conserva avisos e intentos; el worker simulado puede reintentarlos después de reiniciar. No se utiliza un broker externo ni se promete entrega exactamente una vez al proveedor real.
 
-## Ampliación al escenario del resort
+## Despliegue y ampliaciones
 
-Restaurante y Spa/Actividades se incorporarán después de los cuatro servicios base. Registrarán hechos de consumo propios y enviarán cargos a Pagos con `reservaId`, `origen` y `origenId`. Una restricción única sobre el origen evitará duplicar cargos. Estos dos dominios no forman parte de la implementación actual.
+Compose ejecuta cuatro PostgreSQL, migraciones, APIs y Gateway. Cada base se conecta únicamente a la red de su dominio; las APIs comparten una red para HTTP interno. Los puertos de prueba se publican exclusivamente en loopback. Las aplicaciones corren como `node` con filesystem de solo lectura y sin privilegios nuevos; el Gateway usa usuario sin privilegios.
+
+La demo local usa HTTP. Un entorno externo necesita TLS en el borde, certificados válidos, gestión y rotación de secretos, restricciones de red, backups y observabilidad. Docker Compose no proporciona por sí mismo alta disponibilidad. Detrás del Gateway el limitador en memoria de Clientes comparte la IP del proxy; no representa limitación distribuida por usuario real.
+
+Restaurante y Spa/Actividades siguen como extensiones del diseño objetivo. Serán dueños de sus consumos y remitirán cargos por `(origen,origenId)` sin editar tablas financieras. El portal web, empleados, check-in/check-out administrativo y reportes tampoco forman parte de esta implementación.

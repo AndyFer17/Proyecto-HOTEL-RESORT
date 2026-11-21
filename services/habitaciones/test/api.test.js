@@ -363,3 +363,132 @@ test('errores genericos: JSON invalido, ruta inexistente, traceId', async () => 
   assert.match(missing.body.traceId, /^[0-9a-f-]{36}$/);
   assert.ok(logs.length > 0);
 });
+
+test('la misma clave concurrente crea exactamente un bloqueo y repite la respuesta', async () => {
+  const key = randomUUID();
+  const input = {
+    reservaId: randomUUID(),
+    desde: addDays(1200),
+    hasta: addDays(1202),
+  };
+  const responses = await Promise.all(
+    Array.from({ length: 4 }, () => block(input, { key })),
+  );
+  assert.deepEqual(
+    responses.map((r) => r.status),
+    [201, 201, 201, 201],
+  );
+  assert.equal(new Set(responses.map((r) => r.body.bloqueoId)).size, 1);
+  assert.equal(
+    (
+      await db.query(
+        'SELECT count(*)::int AS n FROM habitaciones.bloqueos WHERE reserva_id=$1',
+        [input.reservaId],
+      )
+    ).rows[0].n,
+    1,
+  );
+});
+
+test('modificación confirmada calcula total y es idempotente con conflicto de contenido', async () => {
+  const created = await block({ desde: addDays(1300), hasta: addDays(1302) });
+  const path = `/api/v1/interno/bloqueos/${created.body.bloqueoId}`;
+  assert.equal((await service('PUT', `${path}/confirmacion`)).status, 200);
+  const key = randomUUID();
+  const body = { desde: addDays(1301), hasta: addDays(1304), personas: 2 };
+  const options = { method: 'PATCH', token: config.SERVICE_TOKEN, key, body };
+  const changed = await request(path, options);
+  assert.equal(changed.status, 200);
+  assert.equal(changed.body.total, '1980.00');
+  const replay = await request(path, options);
+  assert.deepEqual(replay.body, changed.body);
+  const conflict = await request(path, {
+    ...options,
+    body: { ...body, hasta: addDays(1305) },
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.codigo, 'IDEMPOTENCIA_CONFLICTO');
+});
+
+test('un cambio solapado conserva intactas las fechas de la reserva original', async () => {
+  const a = await block({ desde: addDays(1400), hasta: addDays(1402) });
+  const b = await block({ desde: addDays(1404), hasta: addDays(1406) });
+  const path = `/api/v1/interno/bloqueos/${a.body.bloqueoId}`;
+  await service('PUT', `${path}/confirmacion`);
+  const response = await request(path, {
+    method: 'PATCH',
+    token: config.SERVICE_TOKEN,
+    key: randomUUID(),
+    body: { desde: addDays(1401), hasta: addDays(1405), personas: 2 },
+  });
+  assert.equal(response.status, 409);
+  const row = (
+    await db.query(
+      'SELECT desde::text,hasta::text,estado FROM habitaciones.bloqueos WHERE bloqueo_id=$1',
+      [a.body.bloqueoId],
+    )
+  ).rows[0];
+  assert.equal(row.desde, addDays(1400));
+  assert.equal(row.hasta, addDays(1402));
+  assert.equal(row.estado, 'CONFIRMADO');
+  assert.equal(b.status, 201);
+});
+
+test('las migraciones versionadas no vuelven a aplicar archivos existentes', async () => {
+  assert.equal(await migrate(db), 0);
+});
+
+test('estado operativo se separa de ocupación y no retira habitaciones comprometidas', async () => {
+  const id = '11111111-1111-4111-8111-111111111302';
+  const statePath = `/api/v1/interno/habitaciones/${id}/estado`;
+  const options = (estado) => ({
+    method: 'PATCH',
+    token: config.SERVICE_TOKEN,
+    key: randomUUID(),
+    body: { estado },
+  });
+  assert.equal(
+    (await request(statePath, options('MANTENIMIENTO'))).status,
+    200,
+  );
+  const room = await request(`/api/v1/habitaciones/${id}`);
+  assert.equal(room.body.estado, 'MANTENIMIENTO');
+  const unavailable = await request(
+    `/api/v1/habitaciones/disponibilidad?desde=${addDays(1500)}&hasta=${addDays(1502)}&personas=2`,
+  );
+  assert.equal(
+    unavailable.body.habitaciones.some((h) => h.habitacionId === id),
+    false,
+  );
+  assert.equal(
+    (
+      await block({
+        habitacionId: id,
+        desde: addDays(1500),
+        hasta: addDays(1502),
+      })
+    ).status,
+    404,
+  );
+  assert.equal((await request(statePath, options('EN_SERVICIO'))).status, 200);
+  const booked = await block({
+    habitacionId: id,
+    desde: addDays(1500),
+    hasta: addDays(1502),
+  });
+  assert.equal(booked.status, 201);
+  assert.equal(
+    (
+      await service(
+        'PUT',
+        `/api/v1/interno/bloqueos/${booked.body.bloqueoId}/confirmacion`,
+      )
+    ).status,
+    200,
+  );
+  assert.equal((await request(statePath, options('LIMPIEZA'))).status, 409);
+  assert.equal(
+    (await request(`/api/v1/habitaciones/${id}`)).body.estado,
+    'EN_SERVICIO',
+  );
+});

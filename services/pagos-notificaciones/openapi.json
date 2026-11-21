@@ -2,151 +2,55 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Hotel Resort - Pagos y Notificaciones",
-    "version": "0.1.0",
-    "description": "BORRADOR: contrato preliminar. Servicio NO implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+    "version": "1.0.0",
+    "description": "Servicio academico funcional de cuenta, cargos, pagos simulados y cola de avisos. Propiedad de datos independiente, JWT de huesped e identidad Bearer de servicio. No procesa dinero ni mensajes reales; requiere ALLOW_SIMULATED_PROVIDERS=true y rechaza NODE_ENV=production."
   },
   "servers": [
     {
       "url": "http://localhost:3004",
-      "description": "Desarrollo local - puerto futuro"
+      "description": "Desarrollo academico local"
     }
   ],
   "paths": {
-    "/api/v1/cuentas/{reservaId}": {
+    "/health/live": {
       "get": {
-        "summary": "Consultar cuenta de reserva propia",
+        "operationId": "pagosLive",
+        "summary": "Estado del proceso",
+        "security": [],
+        "parameters": [],
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Resultado de la operacion",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "cargos": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "cargoId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "reservaId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "origen": {
-                            "type": "string"
-                          },
-                          "origenId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "concepto": {
-                            "type": "string"
-                          },
-                          "monto": {
-                            "type": "string",
-                            "pattern": "^\\d{1,10}\\.\\d{2}$",
-                            "example": "660.00"
-                          },
-                          "estado": {
-                            "type": "string",
-                            "enum": ["ACTIVO", "ANULADO"]
-                          }
-                        },
-                        "required": [
-                          "cargoId",
-                          "reservaId",
-                          "origen",
-                          "origenId",
-                          "concepto",
-                          "monto",
-                          "estado"
-                        ]
-                      }
-                    },
-                    "total": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "pagado": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "saldo": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "moneda": {
-                      "type": "string",
-                      "enum": ["PEN"]
-                    }
-                  },
-                  "required": [
-                    "reservaId",
-                    "cargos",
-                    "total",
-                    "pagado",
-                    "saldo",
-                    "moneda"
-                  ]
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             }
-          },
-          "401": {
-            "description": "Error controlado",
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "pagosReady",
+        "summary": "Estado de la persistencia",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Resultado de la operacion",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             }
           },
           "503": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
+            "description": "Persistencia no disponible",
             "content": {
               "application/json": {
                 "schema": {
@@ -155,7 +59,14 @@
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/api/v1/cuentas/{reservaId}": {
+      "get": {
+        "operationId": "consultarCuenta",
+        "summary": "Consultar cuenta propia",
+        "description": "JWT RS256 y comprobacion de titular por API de Reservas. Totales calculados en el servidor con centavos enteros; incluye cargos anulados como historial.",
         "security": [
           {
             "bearerAuth": []
@@ -170,249 +81,41 @@
               "type": "string",
               "format": "uuid"
             }
-          }
-        ]
-      }
-    },
-    "/api/v1/interno/cargos": {
-      "post": {
-        "summary": "Registrar cargo de un servicio autorizado",
-        "responses": {
-          "201": {
-            "description": "Resultado correcto",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "cargoId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "origen": {
-                      "type": "string"
-                    },
-                    "origenId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "concepto": {
-                      "type": "string"
-                    },
-                    "monto": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": ["ACTIVO", "ANULADO"]
-                    }
-                  },
-                  "required": [
-                    "cargoId",
-                    "reservaId",
-                    "origen",
-                    "origenId",
-                    "concepto",
-                    "monto",
-                    "estado"
-                  ]
-                }
-              }
-            }
           },
-          "400": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Validar reserva y monto positivo. Unicidad (origen, origenId). No aceptar cargos arbitrarios de huéspedes.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "reservaId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "origen": {
-                    "type": "string",
-                    "enum": ["ALOJAMIENTO", "RESTAURANTE", "SPA_ACTIVIDADES"]
-                  },
-                  "origenId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "concepto": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "monto": {
-                    "type": "string",
-                    "pattern": "^\\d{1,10}\\.\\d{2}$",
-                    "example": "660.00"
-                  }
-                },
-                "required": [
-                  "reservaId",
-                  "origen",
-                  "origenId",
-                  "concepto",
-                  "monto"
-                ]
-              }
-            }
-          }
-        },
-        "security": [
           {
-            "serviceAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
+            "name": "X-Request-Id",
             "in": "header",
-            "required": true,
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
             "schema": {
               "type": "string",
               "format": "uuid"
             }
           }
-        ]
-      }
-    },
-    "/api/v1/interno/cargos/{id}/anulacion": {
-      "put": {
-        "summary": "Anular cargo por compensación",
+        ],
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Resultado de la operacion",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "cargoId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "origen": {
-                      "type": "string"
-                    },
-                    "origenId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "concepto": {
-                      "type": "string"
-                    },
-                    "monto": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": ["ACTIVO", "ANULADO"]
-                    }
-                  },
-                  "required": [
-                    "cargoId",
-                    "reservaId",
-                    "origen",
-                    "origenId",
-                    "concepto",
-                    "monto",
-                    "estado"
-                  ]
+                  "$ref": "#/components/schemas/Cuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
           },
           "401": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -422,7 +125,7 @@
             }
           },
           "403": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -432,7 +135,7 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -442,7 +145,47 @@
             }
           },
           "409": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -452,7 +195,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -461,168 +214,14 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "serviceAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
+        }
       }
     },
     "/api/v1/pagos": {
       "post": {
-        "summary": "Pagar saldo de una reserva propia",
-        "responses": {
-          "201": {
-            "description": "Resultado correcto",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "pagoId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": ["APROBADO", "RECHAZADO", "PENDIENTE"]
-                    },
-                    "monto": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    }
-                  },
-                  "required": ["pagoId", "estado", "monto"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Solo sandbox; verificar propiedad y saldo. No recibir ni almacenar números de tarjeta.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "reservaId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "monto": {
-                    "type": "string",
-                    "pattern": "^\\d{1,10}\\.\\d{2}$",
-                    "example": "660.00"
-                  },
-                  "metodo": {
-                    "type": "string",
-                    "enum": ["TARJETA_PRUEBA"]
-                  },
-                  "tokenPago": {
-                    "type": "string",
-                    "writeOnly": true
-                  }
-                },
-                "required": ["reservaId", "monto", "metodo", "tokenPago"]
-              }
-            }
-          }
-        },
+        "operationId": "pagarCuenta",
+        "summary": "Pagar saldo total con simulador academico",
+        "description": "Requiere reserva CONFIRMADA y cuenta sin operacion de modificacion/cancelacion. Monto exactamente igual al saldo. Retorna 201 tambien para el recurso RECHAZADO, sin descontar saldo. Un JWT valido permite repetir el resultado persistido del mismo huesped y cuerpo aunque Reservas no este disponible; un cuerpo distinto devuelve409. Sin resultado persistido se verifica titular por API. No se guarda tokenPago. Prohibido en NODE_ENV=production.",
         "security": [
           {
             "bearerAuth": []
@@ -630,170 +229,59 @@
         ],
         "parameters": [
           {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
             "schema": {
               "type": "string",
               "format": "uuid"
             }
           }
-        ]
-      }
-    },
-    "/api/v1/interno/notificaciones": {
-      "post": {
-        "summary": "Encolar confirmación",
-        "responses": {
-          "202": {
-            "description": "Resultado correcto",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "notificacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": ["PENDIENTE"]
-                    }
-                  },
-                  "required": ["notificacionId", "estado"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "eventoId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "reservaId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "tipo": {
-                    "type": "string",
-                    "enum": ["RESERVA_CONFIRMADA", "PAGO_CONFIRMADO"]
-                  }
-                },
-                "required": ["eventoId", "reservaId", "tipo"]
+                "$ref": "#/components/schemas/SolicitudPago"
               }
             }
           }
         },
-        "security": [
-          {
-            "serviceAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
-    "/api/v1/notificaciones/{id}": {
-      "get": {
-        "summary": "Consultar estado de aviso propio",
         "responses": {
-          "200": {
-            "description": "Resultado correcto",
+          "201": {
+            "description": "Resultado de la operacion",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "notificacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": ["PENDIENTE", "ENVIADA", "FALLIDA"]
-                    },
-                    "intentos": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  },
-                  "required": ["notificacionId", "estado", "intentos"]
+                  "$ref": "#/components/schemas/Pago"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
           },
           "401": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -803,7 +291,7 @@
             }
           },
           "403": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -813,7 +301,57 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -823,7 +361,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -832,7 +380,1029 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/interno/cargos": {
+      "post": {
+        "operationId": "registrarCargo",
+        "summary": "Registrar cargo interno idempotente",
+        "description": "Servicio autenticado. Reserva existente PENDIENTE o CONFIRMADA. Unicidad por (origen,origenId); datos distintos producen 409. Rechaza cuenta bloqueada o pagada y total mayor a 9999999999.99 PEN.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearCargo"
+              }
+            }
+          }
         },
+        "responses": {
+          "201": {
+            "description": "Resultado de la operacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cargo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/cargos/{id}": {
+      "patch": {
+        "operationId": "modificarCargo",
+        "summary": "Modificar cargo bajo bloqueo de operacion",
+        "description": "Requiere operacionId que posee el bloqueo durable de la cuenta. No admite cuenta pagada ni cargo anulado. Conserva historial de auditoria y actualiza detalle local.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificarCargo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado de la operacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cargo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "anularCargo",
+        "summary": "Anular cargo sin borrar historial",
+        "description": "Rechaza cuenta con pago aprobado. Si la cuenta esta bloqueada exige X-Operacion-Id del propietario del bloqueo; la saga de Reservas siempre lo utiliza al cancelar.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Operacion-Id",
+            "in": "header",
+            "required": false,
+            "description": "Obligatorio cuando la cuenta tiene un bloqueo de operacion.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operacion completada sin cuerpo"
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/cuentas/{reservaId}/operacion": {
+      "put": {
+        "operationId": "bloquearCuenta",
+        "summary": "Excluir pagos durante modificacion o cancelacion",
+        "description": "Bloqueo durable sin expiracion automatica. Rechaza cuenta pagada o bloqueo de otra operacion. La saga debe recuperar y liberar el bloqueo con el mismo operacionId.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reservaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudBloqueo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado de la operacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBloqueada"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/cuentas/{reservaId}/operacion/{operacionId}": {
+      "delete": {
+        "operationId": "liberarCuenta",
+        "summary": "Liberar bloqueo de la operacion",
+        "description": "Idempotente. Nunca libera una operacion distinta.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reservaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operacionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operacion completada sin cuerpo"
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/notificaciones": {
+      "post": {
+        "operationId": "encolarAviso",
+        "summary": "Encolar evento para aviso",
+        "description": "Cola durable; eventoId unico, reintentos con backoff y limite de cinco intentos. Una falla del aviso no altera la reserva ni el pago. Repetir el evento devuelve el mismo aviso, incluso ya enviado.",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID de idempotencia. Un resultado persistido vincula actor, operacion y clave a su contenido: cambiarlo produce 409. Los errores de validacion o reglas sin efecto local revierten la transaccion y no vinculan la clave.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudNotificacion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Resultado de la operacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvisoEncolado"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notificaciones/{id}": {
+      "get": {
+        "operationId": "consultarAviso",
+        "summary": "Consultar aviso propio",
+        "description": "JWT y titular de la reserva por API de Reservas. SIMULADO significa entrega registrada localmente; no envio real de email o SMS.",
         "security": [
           {
             "bearerAuth": []
@@ -847,8 +1417,140 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "UUID para correlacion entre servicios.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de la operacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notificacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado. La dependencia no disponible se informa como 503.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -876,18 +1578,358 @@
           }
         },
         "required": ["codigo", "mensaje", "detalle", "traceId"]
+      },
+      "Cargo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cargoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origen": {
+            "type": "string",
+            "enum": ["HABITACION", "RESTAURANTE", "SPA_ACTIVIDADES"]
+          },
+          "origenId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "concepto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "monto": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00",
+            "description": "Importe positivo en PEN, exactamente dos decimales; nunca un numero JSON."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["ACTIVO", "ANULADO"]
+          }
+        },
+        "required": [
+          "cargoId",
+          "reservaId",
+          "origen",
+          "origenId",
+          "concepto",
+          "monto",
+          "moneda",
+          "estado"
+        ]
+      },
+      "CrearCargo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origen": {
+            "type": "string",
+            "enum": ["HABITACION", "RESTAURANTE", "SPA_ACTIVIDADES"]
+          },
+          "origenId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "concepto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "monto": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00",
+            "description": "Importe positivo en PEN, exactamente dos decimales; nunca un numero JSON."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"],
+            "default": "PEN"
+          }
+        },
+        "required": ["reservaId", "origen", "origenId", "concepto", "monto"]
+      },
+      "ModificarCargo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "monto": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00",
+            "description": "Importe positivo en PEN, exactamente dos decimales; nunca un numero JSON."
+          },
+          "concepto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "operacionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["monto", "concepto", "operacionId"]
+      },
+      "Cuenta": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cargos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cargo"
+            }
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00"
+          },
+          "pagado": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00"
+          },
+          "saldo": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          }
+        },
+        "required": [
+          "reservaId",
+          "cargos",
+          "total",
+          "pagado",
+          "saldo",
+          "moneda"
+        ]
+      },
+      "SolicitudPago": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "monto": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00",
+            "description": "Importe positivo en PEN, exactamente dos decimales; nunca un numero JSON."
+          },
+          "metodo": {
+            "type": "string",
+            "enum": ["SIMULADO"]
+          },
+          "tokenPago": {
+            "type": "string",
+            "enum": ["tok_aprobado", "tok_rechazado"],
+            "writeOnly": true,
+            "description": "Entrada del simulador academico; nunca tarjeta, credencial bancaria o token de pasarela real."
+          }
+        },
+        "required": ["reservaId", "monto", "metodo", "tokenPago"]
+      },
+      "Pago": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pagoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["APROBADO", "RECHAZADO"]
+          },
+          "monto": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00",
+            "description": "Importe positivo en PEN, exactamente dos decimales; nunca un numero JSON."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          },
+          "notificacionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["pagoId", "reservaId", "estado", "monto", "moneda"]
+      },
+      "SolicitudNotificacion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": ["ReservaConfirmada", "PagoConfirmado"]
+          }
+        },
+        "required": ["reservaId", "eventoId", "tipo"]
+      },
+      "AvisoEncolado": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "notificacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "ENVIADA", "FALLIDA"]
+          }
+        },
+        "required": ["notificacionId", "estado"]
+      },
+      "Notificacion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "notificacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": ["ReservaConfirmada", "PagoConfirmado"]
+          },
+          "canal": {
+            "type": "string",
+            "enum": ["SIMULADO"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "ENVIADA", "FALLIDA"]
+          },
+          "intentos": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fechaEnvio": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "notificacionId",
+          "reservaId",
+          "eventoId",
+          "tipo",
+          "canal",
+          "estado",
+          "intentos",
+          "fechaEnvio"
+        ]
+      },
+      "SolicitudBloqueo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operacionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["operacionId"]
+      },
+      "CuentaBloqueada": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["BLOQUEADA"]
+          }
+        },
+        "required": ["reservaId", "operacionId", "estado"]
+      },
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "servicio": {
+            "type": "string",
+            "enum": ["pagos-notificaciones"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["OK"]
+          }
+        },
+        "required": ["servicio", "estado"]
       }
     },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT RS256"
+        "bearerFormat": "JWT RS256",
+        "description": "Emisor resort-clientes, audiencia resort-api, rol HUESPED. Solo titular de la reserva."
       },
       "serviceAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Token de identidad de servicio, emisión y scopes pendientes de acordar."
+        "description": "SERVICE_TOKEN aleatorio de al menos 32 caracteres, distinto del JWT de usuario, solo en red interna."
       }
     }
   }

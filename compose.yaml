@@ -1,39 +1,56 @@
+# Demo academica local; los proveedores simulados no se permiten en produccion.
+x-api: &api
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+
+x-db: &db
+  image: postgres:17-bookworm
+  healthcheck:
+    test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+    interval: 3s
+    timeout: 3s
+    retries: 30
+
 services:
   clientes-db:
-    image: postgres:17-bookworm
+    <<: *db
     environment:
-      POSTGRES_USER: clientes
+      POSTGRES_USER: clientes_owner
       POSTGRES_DB: clientes
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ejecuta pnpm setup:dev}
+      POSTGRES_PASSWORD: ${CLIENTES_OWNER_PASSWORD:?Ejecuta pnpm setup:dev}
     ports:
       - '127.0.0.1:5433:5432'
-    volumes:
-      - clientes-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U clientes -d clientes']
-      interval: 5s
-      timeout: 3s
-      retries: 15
+    volumes: [clientes-data:/var/lib/postgresql/data]
+    networks: [clientes-db]
+
   clientes-migrate:
+    image: resort-clientes:demo
     build:
       context: .
       dockerfile: services/clientes/Dockerfile
     environment:
-      DATABASE_URL: postgresql://clientes:${POSTGRES_PASSWORD}@clientes-db:5432/clientes
-    command: ['node', 'services/clientes/src/migrate.js']
+      CLIENTES_MIGRATION_DATABASE_URL: postgresql://clientes_owner:${CLIENTES_OWNER_PASSWORD}@clientes-db:5432/clientes
+      CLIENTES_APP_PASSWORD: ${CLIENTES_APP_PASSWORD:?Ejecuta pnpm setup:dev}
+    command: [node, scripts/migrate-service.mjs, clientes]
     depends_on:
       clientes-db:
         condition: service_healthy
+    networks: [clientes-db]
+
   clientes:
+    <<: *api
+    image: resort-clientes:demo
     build:
       context: .
       dockerfile: services/clientes/Dockerfile
-    init: true
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       HOST: 0.0.0.0
       PORT: 3001
-      DATABASE_URL: postgresql://clientes:${POSTGRES_PASSWORD}@clientes-db:5432/clientes
+      DATABASE_URL: postgresql://clientes_app:${CLIENTES_APP_PASSWORD}@clientes-db:5432/clientes
       JWT_PRIVATE_KEY_BASE64: ${JWT_PRIVATE_KEY_BASE64:?Ejecuta pnpm setup:dev}
       JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Ejecuta pnpm setup:dev}
       JWT_ISSUER: resort-clientes
@@ -47,16 +64,247 @@ services:
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          CMD,
+          node,
+          -e,
           "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    security_opt:
-      - no-new-privileges:true
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [servicios, clientes-db]
+
+  habitaciones-db:
+    <<: *db
+    environment:
+      POSTGRES_USER: habitaciones_owner
+      POSTGRES_DB: habitaciones
+      POSTGRES_PASSWORD: ${HABITACIONES_OWNER_PASSWORD:?Ejecuta pnpm setup:dev}
+    ports:
+      - '127.0.0.1:5434:5432'
+    volumes: [habitaciones-data:/var/lib/postgresql/data]
+    networks: [habitaciones-db]
+
+  habitaciones-migrate:
+    image: resort-habitaciones:demo
+    build:
+      context: .
+      dockerfile: services/habitaciones/Dockerfile
+    environment:
+      HABITACIONES_MIGRATION_DATABASE_URL: postgresql://habitaciones_owner:${HABITACIONES_OWNER_PASSWORD}@habitaciones-db:5432/habitaciones
+      HABITACIONES_APP_PASSWORD: ${HABITACIONES_APP_PASSWORD:?Ejecuta pnpm setup:dev}
+    command: [node, scripts/migrate-service.mjs, habitaciones]
+    depends_on:
+      habitaciones-db:
+        condition: service_healthy
+    networks: [habitaciones-db]
+
+  habitaciones:
+    <<: *api
+    image: resort-habitaciones:demo
+    build:
+      context: .
+      dockerfile: services/habitaciones/Dockerfile
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      HABITACIONES_PORT: 3002
+      HABITACIONES_DATABASE_URL: postgresql://habitaciones_app:${HABITACIONES_APP_PASSWORD}@habitaciones-db:5432/habitaciones
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?Ejecuta pnpm setup:dev}
+      BLOQUEO_TTL_SECONDS: 600
+    ports:
+      - '127.0.0.1:3002:3002'
+    depends_on:
+      habitaciones-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3002/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [servicios, habitaciones-db]
+
+  reservas-db:
+    <<: *db
+    environment:
+      POSTGRES_USER: reservas_owner
+      POSTGRES_DB: reservas
+      POSTGRES_PASSWORD: ${RESERVAS_OWNER_PASSWORD:?Ejecuta pnpm setup:dev}
+    ports:
+      - '127.0.0.1:5435:5432'
+    volumes: [reservas-data:/var/lib/postgresql/data]
+    networks: [reservas-db]
+
+  reservas-migrate:
+    image: resort-reservas:demo
+    build:
+      context: .
+      dockerfile: services/reservas/Dockerfile
+    environment:
+      RESERVAS_MIGRATION_DATABASE_URL: postgresql://reservas_owner:${RESERVAS_OWNER_PASSWORD}@reservas-db:5432/reservas
+      RESERVAS_APP_PASSWORD: ${RESERVAS_APP_PASSWORD:?Ejecuta pnpm setup:dev}
+    command: [node, scripts/migrate-service.mjs, reservas]
+    depends_on:
+      reservas-db:
+        condition: service_healthy
+    networks: [reservas-db]
+
+  reservas:
+    <<: *api
+    image: resort-reservas:demo
+    build:
+      context: .
+      dockerfile: services/reservas/Dockerfile
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      RESERVAS_PORT: 3003
+      RESERVAS_DATABASE_URL: postgresql://reservas_app:${RESERVAS_APP_PASSWORD}@reservas-db:5432/reservas
+      JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Ejecuta pnpm setup:dev}
+      JWT_ISSUER: resort-clientes
+      JWT_AUDIENCE: resort-api
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?Ejecuta pnpm setup:dev}
+      DEPENDENCY_TIMEOUT_MS: 3000
+      CLIENTES_URL: http://clientes:3001
+      HABITACIONES_URL: http://habitaciones:3002
+      PAGOS_URL: http://pagos:3004
+    ports:
+      - '127.0.0.1:3003:3003'
+    depends_on:
+      reservas-migrate:
+        condition: service_completed_successfully
+      habitaciones:
+        condition: service_healthy
+      pagos:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3003/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [servicios, reservas-db]
+
+  pagos-db:
+    <<: *db
+    environment:
+      POSTGRES_USER: pagos_owner
+      POSTGRES_DB: pagos
+      POSTGRES_PASSWORD: ${PAGOS_OWNER_PASSWORD:?Ejecuta pnpm setup:dev}
+    ports:
+      - '127.0.0.1:5436:5432'
+    volumes: [pagos-data:/var/lib/postgresql/data]
+    networks: [pagos-db]
+
+  pagos-migrate:
+    image: resort-pagos:demo
+    build:
+      context: .
+      dockerfile: services/pagos-notificaciones/Dockerfile
+    environment:
+      PAGOS_MIGRATION_DATABASE_URL: postgresql://pagos_owner:${PAGOS_OWNER_PASSWORD}@pagos-db:5432/pagos
+      PAGOS_APP_PASSWORD: ${PAGOS_APP_PASSWORD:?Ejecuta pnpm setup:dev}
+    command: [node, scripts/migrate-service.mjs, pagos-notificaciones]
+    depends_on:
+      pagos-db:
+        condition: service_healthy
+    networks: [pagos-db]
+
+  pagos:
+    <<: *api
+    image: resort-pagos:demo
+    build:
+      context: .
+      dockerfile: services/pagos-notificaciones/Dockerfile
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PAGOS_PORT: 3004
+      PAGOS_DATABASE_URL: postgresql://pagos_app:${PAGOS_APP_PASSWORD}@pagos-db:5432/pagos
+      JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Ejecuta pnpm setup:dev}
+      JWT_ISSUER: resort-clientes
+      JWT_AUDIENCE: resort-api
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?Ejecuta pnpm setup:dev}
+      DEPENDENCY_TIMEOUT_MS: 3000
+      RESERVAS_URL: http://reservas:3003
+      ALLOW_SIMULATED_PROVIDERS: 'true'
+      NOTIFICATION_POLL_MS: 1000
+    ports:
+      - '127.0.0.1:3004:3004'
+    depends_on:
+      pagos-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3004/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    networks: [servicios, pagos-db]
+
+  gateway:
+    image: nginx:1.28-alpine
+    user: '101:101'
+    entrypoint: [nginx]
+    command: [-g, daemon off;]
     read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx:uid=101,gid=101,mode=0700
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      clientes:
+        condition: service_healthy
+      habitaciones:
+        condition: service_healthy
+      reservas:
+        condition: service_healthy
+      pagos:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [servicios]
+
 volumes:
   clientes-data:
+  habitaciones-data:
+  reservas-data:
+  pagos-data:
+
+networks:
+  # Bridges separados permiten publicar puertos en loopback del host.
+  # internal:true impediria el acceso local usado por smoke y desarrollo Node.
+  servicios:
+    driver: bridge
+  clientes-db:
+    driver: bridge
+  habitaciones-db:
+    driver: bridge
+  reservas-db:
+    driver: bridge
+  pagos-db:
+    driver: bridge

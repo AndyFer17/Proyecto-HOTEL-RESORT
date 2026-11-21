@@ -1,86 +1,81 @@
-# Proyecto Hotel Resort SOA
+# Hotel Resort Bahía Azul
 
-Plataforma académica para el Hotel Resort Bahía Azul. El objetivo es integrar huéspedes, habitaciones, reservas y pagos mediante servicios con responsabilidades y contratos separados. En una fase posterior se incorporarán restaurante y spa/actividades para consolidar los consumos de la estadía.
+Prototipo académico SOA con cuatro servicios de negocio: **Clientes, Habitaciones, Reservas y Pagos/Notificaciones**. Integra registro y autenticación, disponibilidad, reserva, cuenta de alojamiento, cobro simulado y avisos persistentes. Cada servicio ejecuta su proceso y conserva su propia base PostgreSQL.
 
-**Estado de esta entrega: un servicio implementado, Clientes; tres servicios diseñados, todavía sin implementación.** Esta entrega es un avance de la semana 15 y no cumple aún el mínimo grupal de cuatro servicios funcionales. No hay interfaz web ni integración extremo a extremo en esta versión.
+La política de esta demostración es **reserva confirmada con cargo pendiente y cobro al finalizar**. No se exige un pago para crear la reserva. Las reservas pagadas no pueden cancelarse automáticamente: responden 409 y requieren gestión manual. El flujo con anticipos o reembolsos reales queda fuera del prototipo.
 
-| Servicio               | Estado                       | Responsabilidad                                     | Puerto previsto |
-| ---------------------- | ---------------------------- | --------------------------------------------------- | --------------- |
-| Clientes               | Implementado y probado       | Registro, autenticación y perfil propio del huésped | 3001            |
-| Habitaciones           | Diseño y contrato preliminar | Inventario, disponibilidad por fechas y bloqueos    | 3002            |
-| Reservas               | Diseño y contrato preliminar | Ciclo de vida de la estadía y coordinación          | 3003            |
-| Pagos / Notificaciones | Diseño y contrato preliminar | Cuenta consolidada, cobros y avisos                 | 3004            |
+Los pagos y avisos son simulados, requieren `ALLOW_SIMULATED_PROVIDERS=true` y Pagos rechaza arrancar con `NODE_ENV=production`. El prototipo no mueve dinero ni envía correo/SMS real. Restaurante, Spa/Actividades y frontend siguen pendientes.
 
-## Qué puedes demostrar ahora
+| Componente           | Función                                             | Acceso local            |
+| -------------------- | --------------------------------------------------- | ----------------------- |
+| Gateway Nginx        | Enrutamiento público; bloquea rutas internas        | `http://127.0.0.1:8080` |
+| Clientes             | Registro, login RS256 y perfil propio               | `127.0.0.1:3001`        |
+| Habitaciones         | Inventario, disponibilidad y bloqueos               | `127.0.0.1:3002`        |
+| Reservas             | Estadías, idempotencia, coordinación y recuperación | `127.0.0.1:3003`        |
+| Pagos/Notificaciones | Cuenta, cargos, pagos y avisos con reintento        | `127.0.0.1:3004`        |
 
-1. Registrar un huésped y guardarlo en PostgreSQL.
-2. Iniciar sesión y recibir un JWT firmado con RS256, válido por 15 minutos.
-3. Consultar el perfil propio usando el token.
-4. Rechazar un correo repetido, datos inválidos y consultas a perfiles ajenos.
-5. Mostrar la separación de rutas, negocio y persistencia, las pruebas y el contrato OpenAPI.
+## Ejecutar la demostración
 
-## Requisitos
-
-- Node.js 24 y pnpm 11.25.0 (`npm install --global pnpm@11.25.0`).
-- Docker con Compose para el inicio recomendado. Como alternativa, PostgreSQL 17 instalado por separado.
-- Postman es opcional. Las pruebas automatizadas usan el cliente HTTP de Node.js.
-
-## Inicio recomendado con Docker
-
-Desde la raíz del repositorio:
+Requisitos: Node.js 24, pnpm 11.25.0 y Docker con Compose que admita `up --wait`.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm setup:dev
-docker compose up --build -d
-docker compose ps
+docker compose config --quiet
+docker compose up --build --wait --wait-timeout 180
+pnpm smoke
 ```
 
-`setup:dev` crea `.env` con una contraseña local aleatoria y un par de claves RSA. No sobrescribe un `.env` existente. Compose espera a PostgreSQL, ejecuta la migración y levanta Clientes. Abre `http://localhost:3001/health/ready`: debe responder `200` con `estado: OK`.
+`setup:dev` crea `.env` con claves RSA, token interno y contraseñas distintas de propietario y aplicación para cada base. No sobrescribe un archivo existente y no imprime secretos. Para regenerar explícitamente se puede ejecutar `pnpm setup:dev --force`; hacerlo no cambia contraseñas de volúmenes PostgreSQL existentes. Conserva las credenciales asociadas a los datos que necesites mantener.
+
+Las migraciones se ejecutan con el propietario de cada base. Después se crea un usuario de aplicación con permisos de datos sobre su propio esquema, sin privilegios de superusuario ni creación de objetos. Los procesos API reciben únicamente su URL de aplicación; solo Clientes recibe la clave privada de firma. Las bases tienen redes separadas. Los puertos publicados se limitan a `127.0.0.1`.
+
+Las redes son bridges independientes por dominio. No se marca `internal: true` porque la demostración necesita acceder a los puertos publicados desde el host, tanto para el smoke como para desarrollar las APIs con Node. El aislamiento entre bases se mantiene mediante redes distintas, credenciales propias y permisos SQL; no se afirma que los contenedores carezcan de salida a Internet.
 
 ```sh
-docker compose logs clientes
+docker compose ps
+docker compose logs reservas pagos
 docker compose down
 ```
 
-`down` conserva el volumen de datos. No borres el volumen si necesitas conservar huéspedes. Cambiar la contraseña en `.env` no cambia la contraseña de un volumen PostgreSQL ya inicializado. Conserva tu `.env` local durante el desarrollo.
+`down` conserva los cuatro volúmenes. No uses `down -v` si necesitas conservar huéspedes, reservas, cuentas o pagos. Una base creada por versiones anteriores con otro usuario/contraseña requiere migración explícita o un entorno nuevo; el setup no transforma esos volúmenes.
 
-## Alternativa con Node.js local
+El Gateway expone HTTP solo en loopback. Para acceso remoto debe agregarse terminación TLS con certificado válido en un proxy de confianza y controlar los puertos directos; no se ofrece HTTPS comercial en esta demo. El acceso directo a 3001–3004 permite depuración local y debe mantenerse privado. El Gateway bloquea `/api/v1/interno`, pero las llamadas entre servicios usan sus direcciones internas y token compartido.
+
+## Probar con Postman
+
+Importa [la colección de cuatro servicios](postman/Resort-Cuatro-Servicios.postman_collection.json) y ejecútala en orden con `baseUrl=http://127.0.0.1:8080`. Genera datos ficticios, guarda el JWT y los identificadores en variables y recorre registro → login → disponibilidad → reserva → cuenta → pago rechazado → pago aprobado → aviso → cancelación rechazada de una reserva pagada.
+
+El pago usa `metodo=SIMULADO` y `tokenPago=tok_aprobado` o `tok_rechazado`. Son instrucciones del proveedor de prueba y no credenciales reales. Elimina `accessToken` y datos de ejecución antes de exportar una colección para compartirla. La colección antigua de Clientes se conserva para sus escenarios específicos.
+
+Los contratos completos están en `services/*/openapi.json`. Las operaciones públicas principales son:
+
+| Servicio             | Operaciones                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| Clientes             | `POST /api/v1/clientes`, `POST /api/v1/auth/login`, `GET /api/v1/clientes/{id}`            |
+| Habitaciones         | `GET /api/v1/habitaciones/disponibilidad`, `GET /api/v1/habitaciones/{id}`                 |
+| Reservas             | `POST /api/v1/reservas`, `GET/PATCH/DELETE /api/v1/reservas/{id}`                          |
+| Pagos/Notificaciones | `GET /api/v1/cuentas/{reservaId}`, `POST /api/v1/pagos`, `GET /api/v1/notificaciones/{id}` |
+
+Reservas toma al huésped del `sub` del JWT; el cliente no envía `huespedId`. Las escrituras de reserva y pago necesitan `Idempotency-Key` UUID. Las respuestas monetarias son cadenas decimales en PEN. Los endpoints internos usan Bearer de servicio y nunca el token de un huésped.
+
+## Desarrollo con Node.js y bases Docker
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm setup:dev
-docker compose up -d clientes-db
+docker compose up -d clientes-db habitaciones-db reservas-db pagos-db
 pnpm db:migrate
-pnpm start
+pnpm db:migrate:habitaciones
+pnpm db:migrate:reservas
+pnpm db:migrate:pagos
 ```
 
-Si usas PostgreSQL instalado por separado, crea una base exclusiva para Clientes y modifica `DATABASE_URL` en `.env` antes de ejecutar la migración. La configuración de ejemplo usa `127.0.0.1:5433`. `pnpm dev` reinicia el servidor al editar código.
+Abre cuatro terminales y ejecuta respectivamente `pnpm start`, `pnpm start:habitaciones`, `pnpm start:reservas` y `pnpm start:pagos`. Sus variantes `dev`, `dev:habitaciones`, `dev:reservas` y `dev:pagos` activan watch. El lanzador filtra el entorno de cada proceso para que no herede claves privadas ni credenciales de otros dominios. Para ejecutar el smoke sin Gateway, configura `TEST_GATEWAY_URL` como cadena vacía. Por defecto prueba el Gateway y las cuatro APIs de Compose.
 
-## Demostración con Postman
+Las bases locales se publican en 5433–5436. Cada `*_MIGRATION_DATABASE_URL` usa propietario; `DATABASE_URL` y los otros `*_DATABASE_URL` usan roles de aplicación. `.env.example` documenta todas las variables sin proporcionar secretos válidos.
 
-Importa [la colección](postman/Resort-Clientes.postman_collection.json). Usa `baseUrl=http://localhost:3001`. Ejecuta las solicitudes en orden o con Collection Runner. El script inicial genera un correo ficticio distinto; los siguientes guardan `clienteId` y `accessToken` como variables de colección.
-
-1. **Disponibilidad del servicio**: respuesta 200.
-2. **Registrar huésped**: respuesta 201 con `clienteId`.
-3. **Iniciar sesión**: respuesta 200 con `accessToken`.
-4. **Consultar mi perfil**: respuesta 200.
-5. **Rechazar correo duplicado**: respuesta 409.
-6. **Rechazar consulta sin token**: respuesta 401.
-7. **Rechazar perfil ajeno**: respuesta 403.
-
-Solo usa datos ficticios. Elimina el token de las variables antes de exportar una colección para compartirla. El contrato completo está en [Clientes OpenAPI](services/clientes/openapi.json).
-
-| Método | Ruta                     | Acceso                             |
-| ------ | ------------------------ | ---------------------------------- |
-| POST   | `/api/v1/clientes`       | Público, registro limitado por IP  |
-| POST   | `/api/v1/auth/login`     | Público, intentos limitados por IP |
-| GET    | `/api/v1/clientes/{id}`  | JWT y propietario del perfil       |
-| GET    | `/.well-known/jwks.json` | Público, únicamente clave pública  |
-| GET    | `/health/live`           | Proceso activo                     |
-| GET    | `/health/ready`          | Base y tabla disponibles           |
-
-## Calidad y pruebas
+## Comprobaciones y evidencia
 
 ```sh
 pnpm check
@@ -88,43 +83,29 @@ pnpm test:coverage
 pnpm audit --prod --audit-level=high
 ```
 
-`pnpm check` ejecuta ESLint, Prettier, validación de los cuatro contratos OpenAPI y 16 pruebas. Sin `TEST_DATABASE_URL`, usa PGlite (PostgreSQL embebido) para ejecutar SQL real sin instalar un servidor. Incluye una prueba de persistencia en disco al cerrar y reabrir la base.
+`check` ejecuta ESLint, Prettier, validación de los cuatro OpenAPI y suites por servicio más integración. Las suites pueden usar PGlite sin servidor externo; CI configura cuatro bases PostgreSQL reales mediante `TEST_DATABASE_URL`, `TEST_HABITACIONES_DATABASE_URL`, `TEST_RESERVAS_DATABASE_URL` y `TEST_PAGOS_DATABASE_URL`.
 
-Para probar contra PostgreSQL por TCP, configura `TEST_DATABASE_URL` con una base exclusiva de pruebas. La suite crea tablas y registros ficticios; no debe ejecutarse sobre una base de producción. El workflow de GitHub Actions usa PostgreSQL 17 y no necesita secretos del repositorio.
+GitHub Actions también construye e inicia Compose y ejecuta el smoke contra APIs y Gateway. La presencia de archivos y pruebas no acredita una ejecución aprobada: consulta el resultado de esta rama y [las pautas de evidencia](docs/pruebas.md). Solo apunta las suites a bases exclusivas de prueba.
 
-## Organización
+## Organización y continuidad
 
 ```text
-.github/                 CI y plantilla de pull request
-docs/                    Arquitectura, decisiones, pruebas y guía de defensa
-postman/                 Colección ejecutable
-scripts/                 Configuración local y validación de contratos
-services/
-  clientes/              Único servicio funcional
-    migrations/          Esquema SQL versionado
-    src/
-      domain/            Casos de uso
-      repositories/      Consultas SQL parametrizadas
-      security/          Contraseñas y JWT
-      app.js             Rutas y middleware
-      server.js          Inicio y apagado
-    test/                Pruebas de HTTP, seguridad y persistencia
-  habitaciones/          README y OpenAPI preliminar
-  reservas/              README y OpenAPI preliminar
-  pagos-notificaciones/  README y OpenAPI preliminar
+services/clientes/              Identidad y huéspedes
+services/habitaciones/          Inventario y bloqueos
+services/reservas/              Estadías y coordinación recuperable
+services/pagos-notificaciones/  Cargos, cobros y avisos
+services/shared/                Errores, HTTP, seguridad y utilidades comunes
+test/integration/               Escenarios entre los cuatro servicios
+scripts/                       Setup, migraciones, lanzadores, contratos y smoke
+infra/                         Gateway local
+postman/                       Colecciones de demostración
+docs/                          Arquitectura, decisiones y evidencia
 ```
 
-## Documentación del equipo
+- [Arquitectura y consistencia](docs/arquitectura.md).
+- [Decisiones y límites](docs/decisiones.md).
+- [Pruebas y reproducción](docs/pruebas.md).
+- [Guion de defensa](docs/entrega-y-defensa.md).
+- [Colaboración](CONTRIBUTING.md).
 
-- [Arquitectura e integración prevista](docs/arquitectura.md).
-- [Decisiones y límites de seguridad](docs/decisiones.md).
-- [Servicio Clientes explicado](services/clientes/README.md).
-- [Evidencias de pruebas](docs/pruebas.md).
-- [Guion para la exposición y próximos pasos](docs/entrega-y-defensa.md).
-- [Cómo colaborar](CONTRIBUTING.md).
-
-## Alcance y pendientes
-
-No se implementaron todavía Habitaciones, Reservas, Pagos/Notificaciones, API Gateway, cuentas de empleados, correo real, pasarela de pagos ni frontend. Los esquemas OpenAPI de esos tres servicios son propuestas para acordar en equipo. Docker y CI se incluyen para reproducibilidad; consulta el registro de pruebas para distinguir qué se verificó realmente.
-
-El prototipo local usa HTTP únicamente en loopback. Un despliegue externo requiere HTTPS, gestión de secretos, rotación de claves, límites distribuidos, copias de seguridad y revisión de permisos. No es una plataforma lista para operación comercial.
+El informe académico plantea seis servicios y recomienda comenzar por estos cuatro. La implementación debe comprobarse con persistencia, comunicación, escenarios de fallo y evidencia reproducible. Quedan fuera los proveedores reales, reembolsos, cuentas de empleados, frontend y las extensiones de Restaurante y Spa/Actividades. No se presenta como plataforma lista para operación comercial.
