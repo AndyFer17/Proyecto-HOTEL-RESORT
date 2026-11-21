@@ -30,6 +30,8 @@ pnpm smoke
 
 Las migraciones se ejecutan con el propietario de cada base. Después se crea un usuario de aplicación con permisos de datos sobre su propio esquema, sin privilegios de superusuario ni creación de objetos. Los procesos API reciben únicamente su URL de aplicación; solo Clientes recibe la clave privada de firma. Las bases tienen redes separadas. Los puertos publicados se limitan a `127.0.0.1`.
 
+Las redes son bridges independientes por dominio. No se marca `internal: true` porque la demostración necesita acceder a los puertos publicados desde el host, tanto para el smoke como para desarrollar las APIs con Node. El aislamiento entre bases se mantiene mediante redes distintas, credenciales propias y permisos SQL; no se afirma que los contenedores carezcan de salida a Internet.
+
 ```sh
 docker compose ps
 docker compose logs reservas pagos

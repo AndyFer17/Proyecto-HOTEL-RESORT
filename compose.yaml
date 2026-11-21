@@ -296,13 +296,15 @@ volumes:
   pagos-data:
 
 networks:
+  # Bridges separados permiten publicar puertos en loopback del host.
+  # internal:true impediria el acceso local usado por smoke y desarrollo Node.
   servicios:
-    internal: true
+    driver: bridge
   clientes-db:
-    internal: true
+    driver: bridge
   habitaciones-db:
-    internal: true
+    driver: bridge
   reservas-db:
-    internal: true
+    driver: bridge
   pagos-db:
-    internal: true
+    driver: bridge
