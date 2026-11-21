@@ -61,12 +61,12 @@ Todas las respuestas de aplicación incluyen `X-Request-Id`; los errores incluye
 
 ## Persistencia
 
-`001_create_clientes.sql` crea el esquema, la tabla y el registro de migración. Es repetible para el arranque académico. Para futuras modificaciones se agregarán migraciones nuevas: no se editará una migración ya desplegada ni se confiará en `CREATE TABLE IF NOT EXISTS` para cambiar columnas.
+`001_create_clientes.sql` crea el esquema, la tabla y el registro de migración. El migrador común guarda el checksum en `public.soa_migrations` y omite versiones aplicadas. Se agregan nuevas migraciones para cambiar columnas. El rol de ejecución recibe solo DML de su dominio; no se le entrega la contraseña de migración.
 
 La tabla utiliza UUID, un índice único de correo, restricciones de nombre/rol y `timestamptz`. `clienteId` es el identificador canónico; el `huespedId` mencionado en contratos de Reservas referenciará el mismo UUID. No se crearán claves foráneas físicas entre bases de servicios.
 
-## Autenticación entre futuros servicios
+## Autenticación entre servicios
 
-Clientes firma JWT con su clave privada. `/.well-known/jwks.json` publica la clave pública. Habitaciones, Reservas y Pagos podrán verificar RS256, `iss`, `aud` y `exp` sin recibir la clave privada. Además deberán verificar permisos y propiedad de sus recursos.
+Clientes firma JWT con su clave privada. `/.well-known/jwks.json` publica la clave pública. Reservas y Pagos verifican RS256, tipo JWT, UUID de sujeto, `iss`, `aud`, expiración y claims requeridos sin recibir la clave privada. Cada dominio verifica la propiedad de sus recursos. Habitaciones permite consultas públicas y usa identidad de servicio para sus mutaciones.
 
-Este JWT representa a un huésped. No autoriza por sí solo operaciones internas privilegiadas, como generar cargos o bloquear inventario: estas necesitarán identidad de servicio y permisos específicos. No existe aún un endpoint que permita a Reservas listar huéspedes o acceder arbitrariamente a perfiles.
+Este JWT representa a un huésped. No autoriza operaciones internas privilegiadas, como generar cargos o bloquear inventario: estas usan un token compartido en la red backend de la demo. No hay un endpoint para listar huéspedes o acceder arbitrariamente a perfiles. El Gateway bloquea rutas internas; una exposición productiva requiere identidad de servicio con alcance, TLS y gestión de secretos adecuada.

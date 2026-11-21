@@ -1,0 +1,697 @@
+{
+  "info": {
+    "name": "Hotel Resort - Cuatro servicios SOA",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Demo local con cobro al finalizar, pagos y avisos SIMULADOS. Ejecutar en orden con Compose sano; prueba registro, reserva idempotente, cuenta, rechazo/aprobacion de pago y aviso persistente. El paso 15 reintenta hasta 20 veces en Collection Runner. Para escenarios de dependencias caidas o 202 usar la suite de integracion. Borra accessToken antes de exportar; usa datos ficticios. No mueve dinero ni envia correo real."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080"
+    },
+    {
+      "key": "password",
+      "value": "Demo-academica-2026!"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "clienteId",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "habitacionId",
+      "value": ""
+    },
+    {
+      "key": "reservaId",
+      "value": ""
+    },
+    {
+      "key": "pagoId",
+      "value": ""
+    },
+    {
+      "key": "notificacionId",
+      "value": ""
+    },
+    {
+      "key": "total",
+      "value": ""
+    },
+    {
+      "key": "saldo",
+      "value": ""
+    },
+    {
+      "key": "desde",
+      "value": ""
+    },
+    {
+      "key": "hasta",
+      "value": ""
+    },
+    {
+      "key": "reservaKey",
+      "value": ""
+    },
+    {
+      "key": "pagoKey",
+      "value": ""
+    },
+    {
+      "key": "rechazoKey",
+      "value": ""
+    },
+    {
+      "key": "cancelacionKey",
+      "value": ""
+    },
+    {
+      "key": "polls",
+      "value": "0"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Gateway disponible",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health/ready"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('email', 'demo-' + pm.variables.replaceIn('{{$guid}}') + '@example.com');",
+              "for (const key of ['reservaKey', 'pagoKey', 'rechazoKey', 'cancelacionKey']) pm.collectionVariables.set(key, pm.variables.replaceIn('{{$guid}}'));",
+              "const start = new Date(); start.setUTCDate(start.getUTCDate() + 30 + Math.floor(Math.random() * 330));",
+              "const end = new Date(start); end.setUTCDate(end.getUTCDate() + 2);",
+              "pm.collectionVariables.set('desde', start.toISOString().slice(0, 10)); pm.collectionVariables.set('hasta', end.toISOString().slice(0, 10));",
+              "pm.collectionVariables.unset('accessToken'); pm.collectionVariables.set('polls', 0);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Registrar huesped ficticio",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/clientes",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Huesped Demo\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('clienteId', pm.response.json().clienteId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Iniciar sesion",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Consultar mi perfil",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/clientes/{{clienteId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Perfil propio', () => pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get('email')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Consultar disponibilidad",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/habitaciones/disponibilidad?desde={{desde}}&hasta={{hasta}}&personas=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const rooms = pm.response.json().habitaciones; pm.test('Hay inventario disponible', () => pm.expect(rooms.length).to.be.above(0)); if (rooms.length) pm.collectionVariables.set('habitacionId', rooms[0].habitacionId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Crear reserva con cargo pendiente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{reservaKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/reservas",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"habitacionId\": \"{{habitacionId}}\",\n  \"desde\": \"{{desde}}\",\n  \"hasta\": \"{{hasta}}\",\n  \"personas\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "const r = pm.response.json(); pm.collectionVariables.set('reservaId', r.reservaId); pm.test('Reserva confirmada', () => pm.expect(r.estado).to.eql('CONFIRMADA')); pm.collectionVariables.set('total', r.total);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Repetir creacion sin duplicar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{reservaKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/reservas",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"habitacionId\": \"{{habitacionId}}\",\n  \"desde\": \"{{desde}}\",\n  \"hasta\": \"{{hasta}}\",\n  \"personas\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Mismo identificador', () => pm.expect(pm.response.json().reservaId).to.eql(pm.collectionVariables.get('reservaId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Consultar mi reserva",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/reservas/{{reservaId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Propietario autenticado', () => pm.expect(pm.response.json().huespedId).to.eql(pm.collectionVariables.get('clienteId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Consultar cuenta consolidada",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cuentas/{{reservaId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const c = pm.response.json(); pm.collectionVariables.set('saldo', c.saldo); pm.test('Cargo de alojamiento', () => pm.expect(c.saldo).to.eql(pm.collectionVariables.get('total')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Simular pago rechazado",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{rechazoKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/pagos",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservaId\": \"{{reservaId}}\",\n  \"monto\": \"{{saldo}}\",\n  \"metodo\": \"SIMULADO\",\n  \"tokenPago\": \"tok_rechazado\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Rechazado sin cobrar', () => pm.expect(pm.response.json().estado).to.eql('RECHAZADO'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Verificar saldo tras rechazo",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cuentas/{{reservaId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Saldo conservado', () => pm.expect(pm.response.json().saldo).to.eql(pm.collectionVariables.get('saldo')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Simular pago aprobado",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{pagoKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/pagos",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservaId\": \"{{reservaId}}\",\n  \"monto\": \"{{saldo}}\",\n  \"metodo\": \"SIMULADO\",\n  \"tokenPago\": \"tok_aprobado\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "const p = pm.response.json(); pm.test('Aprobado', () => pm.expect(p.estado).to.eql('APROBADO')); pm.collectionVariables.set('pagoId', p.pagoId); pm.collectionVariables.set('notificacionId', p.notificacionId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Repetir pago sin cobrar dos veces",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{pagoKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/pagos",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservaId\": \"{{reservaId}}\",\n  \"monto\": \"{{saldo}}\",\n  \"metodo\": \"SIMULADO\",\n  \"tokenPago\": \"tok_aprobado\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Mismo pago', () => pm.expect(pm.response.json().pagoId).to.eql(pm.collectionVariables.get('pagoId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Cuenta pagada",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cuentas/{{reservaId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Sin saldo pendiente', () => pm.expect(pm.response.json().saldo).to.eql('0.00'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Esperar aviso simulado persistente",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/notificaciones/{{notificacionId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const n = pm.response.json(); const polls = Number(pm.collectionVariables.get('polls') || 0);",
+              "if (n.estado !== 'ENVIADA' && polls < 20) { pm.collectionVariables.set('polls', polls + 1); setTimeout(() => pm.execution.setNextRequest(pm.info.requestName), 500); } else { pm.test('Aviso enviado por simulador', () => pm.expect(n.estado).to.eql('ENVIADA')); pm.collectionVariables.set('polls', 0); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Rechazar cancelacion de reserva pagada",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{cancelacionKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/reservas/{{reservaId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Rechazar cuenta sin JWT",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cuentas/{{reservaId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Ocultar ruta interna desde Gateway",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/interno/reservas/{{reservaId}}/titular"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

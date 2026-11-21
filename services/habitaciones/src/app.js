@@ -1,10 +1,13 @@
 import express from 'express';
 import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { randomUUID } from 'node:crypto';
 import { AppError } from './errors.js';
 import {
   disponibilidadSchema,
   bloqueoSchema,
+  cambioSchema,
+  estadoSchema,
   idSchema,
   idempotencySchema,
   parse,
@@ -48,6 +51,23 @@ export function createApp({ db, config, logger = console, clock }) {
     next();
   });
   app.use(express.json({ limit: '16kb' }));
+  app.use(
+    rateLimit({
+      windowMs: 60000,
+      limit: 300,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      skip: (req) => req.path.startsWith('/health/'),
+      handler: (req, res, next) =>
+        next(
+          new AppError(
+            429,
+            'DEMASIADAS_SOLICITUDES',
+            'Intenta nuevamente más tarde.',
+          ),
+        ),
+    }),
+  );
 
   function requireJson(req, res, next) {
     if (!req.is('application/json'))
@@ -116,17 +136,47 @@ export function createApp({ db, config, logger = console, clock }) {
     '/api/v1/interno/bloqueos/:id/confirmacion',
     requireService,
     async (req, res) => {
-      idempotencyKey(req);
-      res.json(await service.confirmar(parse(idSchema, req.params.id)));
+      const key = idempotencyKey(req);
+      res.json(await service.confirmar(parse(idSchema, req.params.id), key));
     },
   );
   app.delete(
     '/api/v1/interno/bloqueos/:id',
     requireService,
     async (req, res) => {
-      idempotencyKey(req);
-      await service.liberar(parse(idSchema, req.params.id));
+      const key = idempotencyKey(req);
+      await service.liberar(parse(idSchema, req.params.id), key);
       res.status(204).end();
+    },
+  );
+
+  app.patch(
+    '/api/v1/interno/bloqueos/:id',
+    requireService,
+    requireJson,
+    async (req, res) => {
+      res.json(
+        await service.modificar(
+          parse(idSchema, req.params.id),
+          idempotencyKey(req),
+          parse(cambioSchema, req.body),
+        ),
+      );
+    },
+  );
+  app.patch(
+    '/api/v1/interno/habitaciones/:id/estado',
+    requireService,
+    requireJson,
+    async (req, res) => {
+      const input = parse(estadoSchema, req.body);
+      res.json(
+        await repository.setOperationalState(
+          parse(idSchema, req.params.id),
+          idempotencyKey(req),
+          input.estado,
+        ),
+      );
     },
   );
 

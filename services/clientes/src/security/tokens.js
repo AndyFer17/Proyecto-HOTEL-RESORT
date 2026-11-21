@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { importPKCS8, importSPKI, exportJWK, SignJWT, jwtVerify } from 'jose';
+import { z } from 'zod';
 
 export async function createTokens(config) {
   const privateKey = await importPKCS8(
@@ -35,13 +36,17 @@ export async function createTokens(config) {
         .sign(privateKey);
     },
     async verify(token) {
-      const { payload } = await jwtVerify(token, publicKey, {
+      const { payload, protectedHeader } = await jwtVerify(token, publicKey, {
         algorithms: ['RS256'],
         issuer: config.JWT_ISSUER,
         audience: config.JWT_AUDIENCE,
         requiredClaims: ['sub', 'iat', 'exp', 'jti', 'rol'],
       });
-      if (payload.rol !== 'HUESPED' || typeof payload.sub !== 'string')
+      if (
+        protectedHeader.typ !== 'JWT' ||
+        payload.rol !== 'HUESPED' ||
+        !z.string().uuid().safeParse(payload.sub).success
+      )
         throw new Error('Identidad inválida');
       return payload;
     },

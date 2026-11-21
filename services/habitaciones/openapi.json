@@ -1,97 +1,50 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Hotel Resort - Habitaciones",
-    "version": "0.1.0",
-    "description": "BORRADOR: contrato preliminar. Servicio NO implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+    "title": "Hotel Resort Bahía Azul Habitaciones",
+    "version": "1.0.0",
+    "description": "Inventario funcional con bloqueos transaccionales, exclusión de solapamientos, estado operativo e idempotencia persistente. Intervalos [desde,hasta), zona America/Lima y máximo 30 noches. Las rutas internas usan identidad de servicio, no JWT de huésped."
   },
   "servers": [
     {
       "url": "http://localhost:3002",
-      "description": "Desarrollo local - puerto futuro"
+      "description": "Desarrollo local; usar TLS al exponer fuera del equipo."
     }
   ],
   "paths": {
-    "/api/v1/habitaciones/disponibilidad": {
+    "/health/live": {
       "get": {
-        "summary": "Consultar habitaciones disponibles",
+        "summary": "Estado del proceso",
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Proceso disponible",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "habitaciones": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "habitacionId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "numero": {
-                            "type": "string"
-                          },
-                          "tipo": {
-                            "type": "string"
-                          },
-                          "capacidad": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "tarifaNoche": {
-                            "type": "string",
-                            "pattern": "^\\d{1,10}\\.\\d{2}$",
-                            "example": "660.00"
-                          },
-                          "moneda": {
-                            "type": "string",
-                            "enum": ["PEN"]
-                          }
-                        },
-                        "required": [
-                          "habitacionId",
-                          "numero",
-                          "tipo",
-                          "capacidad",
-                          "tarifaNoche",
-                          "moneda"
-                        ]
-                      }
-                    }
-                  },
-                  "required": ["habitaciones"]
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Acceso a persistencia",
+        "responses": {
+          "200": {
+            "description": "Persistencia disponible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             }
           },
-          "400": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
+          "503": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -100,8 +53,12 @@
               }
             }
           }
-        },
-        "security": [],
+        }
+      }
+    },
+    "/api/v1/habitaciones/disponibilidad": {
+      "get": {
+        "summary": "Consultar inventario disponible",
         "parameters": [
           {
             "name": "desde",
@@ -127,62 +84,54 @@
             "required": true,
             "schema": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "maximum": 20
             }
           }
-        ]
-      }
-    },
-    "/api/v1/habitaciones/{id}": {
-      "get": {
-        "summary": "Consultar habitación",
+        ],
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Habitaciones activas y en servicio, sin solapamiento vigente.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "habitacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "numero": {
-                      "type": "string"
-                    },
-                    "tipo": {
-                      "type": "string"
-                    },
-                    "capacidad": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "tarifaNoche": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "moneda": {
-                      "type": "string",
-                      "enum": ["PEN"]
+                    "habitaciones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Habitacion"
+                      }
                     }
                   },
-                  "required": [
-                    "habitacionId",
-                    "numero",
-                    "tipo",
-                    "capacidad",
-                    "tarifaNoche",
-                    "moneda"
-                  ]
+                  "required": ["habitaciones"]
                 }
               }
             }
           },
           "400": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -192,7 +141,57 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -202,7 +201,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -211,8 +220,12 @@
               }
             }
           }
-        },
-        "security": [],
+        }
+      }
+    },
+    "/api/v1/habitaciones/{id}": {
+      "get": {
+        "summary": "Consultar habitación y estado operativo",
         "parameters": [
           {
             "name": "id",
@@ -223,66 +236,20 @@
               "format": "uuid"
             }
           }
-        ]
-      }
-    },
-    "/api/v1/interno/bloqueos": {
-      "post": {
-        "summary": "Reservas solicita bloqueo temporal",
+        ],
         "responses": {
-          "201": {
-            "description": "Resultado correcto",
+          "200": {
+            "description": "Habitación activa, incluso si está en mantenimiento.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "bloqueoId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "habitacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "desde": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "hasta": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "venceEn": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "total": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "moneda": {
-                      "type": "string",
-                      "enum": ["PEN"]
-                    }
-                  },
-                  "required": [
-                    "bloqueoId",
-                    "habitacionId",
-                    "desde",
-                    "hasta",
-                    "venceEn",
-                    "total",
-                    "moneda"
-                  ]
+                  "$ref": "#/components/schemas/Habitacion"
                 }
               }
             }
           },
           "400": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -292,7 +259,7 @@
             }
           },
           "401": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -302,7 +269,17 @@
             }
           },
           "403": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -312,7 +289,27 @@
             }
           },
           "409": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -322,7 +319,17 @@
             }
           },
           "422": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -332,7 +339,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -341,8 +358,28 @@
               }
             }
           }
-        },
-        "description": "Bloqueo atómico con expiración definida por servidor. Clave idempotente y control de solapamientos obligatorios.",
+        }
+      }
+    },
+    "/api/v1/interno/bloqueos": {
+      "post": {
+        "summary": "Crear bloqueo temporal con tarifa calculada por el servidor",
+        "security": [
+          {
+            "Servicio": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -369,7 +406,8 @@
                   },
                   "personas": {
                     "type": "integer",
-                    "minimum": 1
+                    "minimum": 1,
+                    "maximum": 20
                   }
                 },
                 "required": [
@@ -383,12 +421,148 @@
             }
           }
         },
+        "responses": {
+          "201": {
+            "description": "Operación completada; los reintentos repiten la respuesta persistida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bloqueo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/bloqueos/{id}/confirmacion": {
+      "put": {
+        "summary": "Confirmar bloqueo vigente; no admite bloques liberados o expirados",
         "security": [
           {
-            "serviceAuth": []
+            "Servicio": []
           }
         ],
         "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "Idempotency-Key",
             "in": "header",
@@ -398,15 +572,10 @@
               "format": "uuid"
             }
           }
-        ]
-      }
-    },
-    "/api/v1/interno/bloqueos/{id}/confirmacion": {
-      "put": {
-        "summary": "Confirmar ocupación",
+        ],
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Operación completada; los reintentos repiten la respuesta persistida.",
             "content": {
               "application/json": {
                 "schema": {
@@ -427,8 +596,18 @@
               }
             }
           },
+          "400": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -438,7 +617,7 @@
             }
           },
           "403": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -448,7 +627,7 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -458,7 +637,47 @@
             }
           },
           "409": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -468,7 +687,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -477,96 +706,15 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "serviceAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
+        }
       }
     },
     "/api/v1/interno/bloqueos/{id}": {
-      "delete": {
-        "summary": "Liberar bloqueo u ocupación por compensación/cancelación",
-        "responses": {
-          "204": {
-            "description": "Resultado correcto"
-          },
-          "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "description": "Solo Reservas; conservar historial y liberar inventario de forma idempotente.",
+      "patch": {
+        "summary": "Modificar rango confirmado atómicamente; un conflicto conserva las fechas anteriores",
         "security": [
           {
-            "serviceAuth": []
+            "Servicio": []
           }
         ],
         "parameters": [
@@ -588,11 +736,492 @@
               "format": "uuid"
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "desde": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hasta": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "personas": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  }
+                },
+                "required": ["desde", "hasta", "personas"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operación completada; los reintentos repiten la respuesta persistida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bloqueo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Liberar bloqueo o inventario confirmado",
+        "security": [
+          {
+            "Servicio": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada sin cuerpo."
+          },
+          "400": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/habitaciones/{id}/estado": {
+      "patch": {
+        "summary": "Cambiar estado operativo; se rechaza retirar inventario comprometido",
+        "security": [
+          {
+            "Servicio": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "estado": {
+                    "type": "string",
+                    "enum": ["EN_SERVICIO", "LIMPIEZA", "MANTENIMIENTO"]
+                  }
+                },
+                "required": ["estado"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operación completada; los reintentos repiten la respuesta persistida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "habitacionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": ["EN_SERVICIO", "LIMPIEZA", "MANTENIMIENTO"]
+                    }
+                  },
+                  "required": ["habitacionId", "estado"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado; incluye traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
   "components": {
+    "securitySchemes": {
+      "Servicio": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token compartido interno de al menos 32 caracteres; nunca entregarlo al huésped."
+      }
+    },
     "schemas": {
       "Error": {
         "type": "object",
@@ -616,18 +1245,114 @@
           }
         },
         "required": ["codigo", "mensaje", "detalle", "traceId"]
-      }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT RS256"
       },
-      "serviceAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "Token de identidad de servicio, emisión y scopes pendientes de acordar."
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "servicio": {
+            "type": "string",
+            "enum": ["habitaciones"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["OK"]
+          }
+        },
+        "required": ["servicio", "estado"]
+      },
+      "Habitacion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "habitacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "capacidad": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tarifaNoche": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["EN_SERVICIO", "LIMPIEZA", "MANTENIMIENTO"]
+          }
+        },
+        "required": [
+          "habitacionId",
+          "numero",
+          "tipo",
+          "capacidad",
+          "tarifaNoche",
+          "moneda",
+          "estado"
+        ]
+      },
+      "Bloqueo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bloqueoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "habitacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,9})\\.\\d{2}$",
+            "example": "660.00"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["CONFIRMADO"]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "bloqueoId",
+          "habitacionId",
+          "desde",
+          "hasta",
+          "total",
+          "moneda"
+        ]
       }
     }
   }

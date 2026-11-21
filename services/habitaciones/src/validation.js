@@ -25,6 +25,16 @@ export const bloqueoSchema = z
   })
   .strict();
 export const idSchema = z.string().uuid();
+export const cambioSchema = z
+  .object({
+    desde: fecha,
+    hasta: fecha,
+    personas: z.number().int().min(1).max(20),
+  })
+  .strict();
+export const estadoSchema = z
+  .object({ estado: z.enum(['EN_SERVICIO', 'LIMPIEZA', 'MANTENIMIENTO']) })
+  .strict();
 export const idempotencySchema = z.string().uuid();
 
 export function parse(schema, input) {

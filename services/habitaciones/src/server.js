@@ -4,7 +4,9 @@ import { createApp } from './app.js';
 
 const config = loadConfig();
 const db = createPool(config.HABITACIONES_DATABASE_URL);
-db.on('error', () => console.error(JSON.stringify({ codigo: 'DB_POOL_ERROR' })));
+db.on('error', () =>
+  console.error(JSON.stringify({ codigo: 'DB_POOL_ERROR' })),
+);
 const app = createApp({ db, config });
 const server = app.listen(config.HABITACIONES_PORT, config.HOST, () =>
   console.log(

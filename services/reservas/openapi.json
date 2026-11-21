@@ -2,83 +2,79 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Hotel Resort - Reservas",
-    "version": "0.1.0",
-    "description": "BORRADOR: contrato preliminar. Servicio NO implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+    "version": "0.2.0",
+    "description": "Servicio implementado con saga durable y recuperacion por worker. Politica academica: registrar cargo al confirmar y cobrar al final; crear una reserva nunca ejecuta un pago. Los importes proceden de Habitaciones. APIs propias requieren JWT HUESPED RS256; APIs internas identidad de servicio."
   },
   "servers": [
     {
       "url": "http://localhost:3003",
-      "description": "Desarrollo local - puerto futuro"
+      "description": "Desarrollo local"
     }
   ],
   "paths": {
     "/api/v1/reservas": {
       "post": {
-        "summary": "Crear reserva del huésped autenticado",
+        "summary": "Crear reserva propia",
+        "description": "El huesped se obtiene del sub verificado del JWT. Se rechaza huespedId en el cuerpo. Bloqueo, confirmacion y cargo usan claves por paso y estado local persistido. Un rechazo definitivo compensa inventario antes de finalizar con error.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Clave durable por huesped y operacion registrada. Otra solicitud con esa clave y cuerpo o recurso distinto devuelve HTTP 409. Los rechazos anteriores al registro no vinculan la clave. Repetir permite recuperar el resultado persistido."
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearReserva"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "Resultado correcto",
+            "description": "Inventario confirmado y cargo registrado. No se ha efectuado ningun cobro.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "huespedId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "habitacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "desde": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "hasta": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": [
-                        "PENDIENTE",
-                        "CONFIRMADA",
-                        "CANCELADA",
-                        "REQUIERE_REVISION"
-                      ]
-                    },
-                    "total": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "moneda": {
-                      "type": "string",
-                      "enum": ["PEN"]
-                    }
-                  },
-                  "required": [
-                    "reservaId",
-                    "huespedId",
-                    "habitacionId",
-                    "desde",
-                    "hasta",
-                    "estado",
-                    "total",
-                    "moneda"
-                  ]
+                  "$ref": "#/components/schemas/Reserva"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Operacion persistida en recuperacion. Consultar la reserva o repetir con la misma clave. No implica reserva confirmada ni cancelacion terminada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pendiente"
                 }
               }
             }
           },
           "400": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -88,7 +84,17 @@
             }
           },
           "401": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -98,7 +104,27 @@
             }
           },
           "409": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -108,7 +134,27 @@
             }
           },
           "422": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -118,17 +164,7 @@
             }
           },
           "503": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -137,172 +173,12 @@
               }
             }
           }
-        },
-        "description": "huespedId se deriva del sub del JWT; total calculado por servidor. Coordina inventario y cargo con recuperación persistente.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "habitacionId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "desde": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "hasta": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "personas": {
-                    "type": "integer",
-                    "minimum": 1
-                  }
-                },
-                "required": ["habitacionId", "desde", "hasta", "personas"]
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
+        }
       }
     },
     "/api/v1/reservas/{id}": {
       "get": {
         "summary": "Consultar reserva propia",
-        "responses": {
-          "200": {
-            "description": "Resultado correcto",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "huespedId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "habitacionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "desde": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "hasta": {
-                      "type": "string",
-                      "format": "date"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": [
-                        "PENDIENTE",
-                        "CONFIRMADA",
-                        "CANCELADA",
-                        "REQUIERE_REVISION"
-                      ]
-                    },
-                    "total": {
-                      "type": "string",
-                      "pattern": "^\\d{1,10}\\.\\d{2}$",
-                      "example": "660.00"
-                    },
-                    "moneda": {
-                      "type": "string",
-                      "enum": ["PEN"]
-                    }
-                  },
-                  "required": [
-                    "reservaId",
-                    "huespedId",
-                    "habitacionId",
-                    "desde",
-                    "hasta",
-                    "estado",
-                    "total",
-                    "moneda"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
         "security": [
           {
             "bearerAuth": []
@@ -317,17 +193,30 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
-        ]
-      },
-      "delete": {
-        "summary": "Cancelar reserva propia y coordinar liberación/anulación",
+        ],
         "responses": {
-          "204": {
-            "description": "Resultado correcto"
+          "200": {
+            "description": "Estado actual, incluido un estado transitorio de recuperacion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reserva"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -337,17 +226,7 @@
             }
           },
           "401": {
-            "description": "Error controlado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -357,7 +236,7 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -367,7 +246,7 @@
             }
           },
           "409": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -376,8 +255,38 @@
               }
             }
           },
-          "503": {
-            "description": "Error controlado",
+          "413": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -387,7 +296,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -396,7 +315,11 @@
               }
             }
           }
-        },
+        }
+      },
+      "patch": {
+        "summary": "Modificar fechas u ocupantes de reserva propia",
+        "description": "Solo CONFIRMADA y sin pago. Se bloquea la cuenta contra pagos concurrentes. Habitaciones aplica el cambio atomicamente: ante HTTP 409 conserva el intervalo original. Si el resultado remoto se desconoce, se mantiene MODIFICANDO y el guard durable hasta recuperar. No se reporta exito parcial.",
         "security": [
           {
             "bearerAuth": []
@@ -419,42 +342,52 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            },
+            "description": "Clave durable por huesped y operacion registrada. Otra solicitud con esa clave y cuerpo o recurso distinto devuelve HTTP 409. Los rechazos anteriores al registro no vinculan la clave. Repetir permite recuperar el resultado persistido."
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
-        ]
-      }
-    },
-    "/api/v1/interno/reservas/{id}/titular": {
-      "get": {
-        "summary": "Verificar titular y estado desde Pagos",
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificarReserva"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Resultado correcto",
+            "description": "Fechas, inventario y cargo ajustados; cuenta desbloqueada.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "reservaId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "huespedId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "estado": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["reservaId", "huespedId", "estado"]
+                  "$ref": "#/components/schemas/Reserva"
                 }
               }
             }
           },
-          "401": {
-            "description": "Error controlado",
+          "202": {
+            "description": "Operacion persistida en recuperacion. Consultar la reserva o repetir con la misma clave. No implica reserva confirmada ni cancelacion terminada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pendiente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -463,8 +396,8 @@
               }
             }
           },
-          "403": {
-            "description": "Error controlado",
+          "401": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -474,7 +407,57 @@
             }
           },
           "404": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -484,7 +467,17 @@
             }
           },
           "500": {
-            "description": "Error controlado",
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado con codigo y traceId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -493,7 +486,167 @@
               }
             }
           }
-        },
+        }
+      },
+      "delete": {
+        "summary": "Cancelar reserva propia",
+        "description": "Solo CONFIRMADA y sin pago. El guard de cuenta excluye pagos concurrentes. Se anula el cargo ANTES de liberar inventario. Si una dependencia falla, CANCELANDO persiste hasta recuperar. Cuentas pagadas producen HTTP 409: no hay reembolso automatico. No admite cuerpo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Clave durable por huesped y operacion registrada. Otra solicitud con esa clave y cuerpo o recurso distinto devuelve HTTP 409. Los rechazos anteriores al registro no vinculan la clave. Repetir permite recuperar el resultado persistido."
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Operacion persistida en recuperacion. Consultar la reserva o repetir con la misma clave. No implica reserva confirmada ni cancelacion terminada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pendiente"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Cargo anulado, inventario liberado y reserva cancelada. La misma clave repite HTTP 204."
+          },
+          "400": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interno/reservas/{id}/titular": {
+      "get": {
+        "summary": "Consultar identidad y estado para otro servicio",
+        "description": "Requiere SERVICE_TOKEN. Un JWT de huesped no autoriza esta operacion.",
         "security": [
           {
             "serviceAuth": []
@@ -508,16 +661,393 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Identidad minima de la reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Titular"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Comprobar proceso",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Proceso activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Comprobar tablas propias y persistencia",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Persistencia disponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado con codigo y traceId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      },
+      "serviceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token compartido de servicio de al menos 32 caracteres, separado del JWT de huesped."
+      }
+    },
     "schemas": {
-      "Error": {
+      "CrearReserva": {
         "type": "object",
         "additionalProperties": false,
+        "required": ["habitacionId", "desde", "hasta", "personas"],
+        "properties": {
+          "habitacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date"
+          },
+          "personas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "description": "Fechas reales; entrada no pasada segun America/Lima; salida posterior; maximo 30 noches. Tarifas y huesped no se aceptan desde el cliente."
+      },
+      "ModificarReserva": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date"
+          },
+          "personas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "description": "Campos omitidos conservan el valor anterior; no permite cambiar huesped ni habitacion."
+      },
+      "Reserva": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reservaId",
+          "huespedId",
+          "habitacionId",
+          "desde",
+          "hasta",
+          "personas",
+          "estado",
+          "total",
+          "moneda",
+          "bloqueoId",
+          "cargoId",
+          "version"
+        ],
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "huespedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "habitacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date"
+          },
+          "personas": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONFIRMADA",
+              "MODIFICANDO",
+              "CANCELANDO",
+              "CANCELADA",
+              "FALLIDA"
+            ]
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,10}\\.\\d{2}$",
+            "example": "1320.00"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": ["PEN"]
+          },
+          "bloqueoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "cargoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "Pendiente": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operacionId", "reservaId", "estado", "fase", "mensaje"],
+        "properties": {
+          "operacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONFIRMADA",
+              "MODIFICANDO",
+              "CANCELANDO",
+              "CANCELADA",
+              "FALLIDA"
+            ]
+          },
+          "fase": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        }
+      },
+      "Titular": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reservaId", "huespedId", "estado"],
+        "properties": {
+          "reservaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "huespedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONFIRMADA",
+              "MODIFICANDO",
+              "CANCELANDO",
+              "CANCELADA",
+              "FALLIDA"
+            ]
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": ["servicio", "estado"],
+        "properties": {
+          "servicio": {
+            "type": "string",
+            "enum": ["reservas"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["OK"]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["codigo", "mensaje", "detalle", "traceId"],
         "properties": {
           "codigo": {
             "type": "string"
@@ -535,20 +1065,7 @@
             "type": "string",
             "format": "uuid"
           }
-        },
-        "required": ["codigo", "mensaje", "detalle", "traceId"]
-      }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT RS256"
-      },
-      "serviceAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "Token de identidad de servicio, emisión y scopes pendientes de acordar."
+        }
       }
     }
   }

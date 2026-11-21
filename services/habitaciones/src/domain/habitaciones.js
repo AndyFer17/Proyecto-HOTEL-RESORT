@@ -72,8 +72,12 @@ export function createHabitacionesService(
         .digest('hex');
       return repository.createBloqueo({ key, huella, input, ttlSeconds });
     },
-    async confirmar(id) {
-      const result = await repository.confirmBloqueo(id);
+    async modificar(id, key, input) {
+      checkRange(input, clock());
+      return repository.changeBloqueo(id, key, input);
+    },
+    async confirmar(id, key) {
+      const result = await repository.confirmBloqueo(id, key);
       if (result === 'NO_ENCONTRADO')
         throw new AppError(
           404,
@@ -88,8 +92,8 @@ export function createHabitacionesService(
         );
       return { bloqueoId: id, estado: 'CONFIRMADO' };
     },
-    async liberar(id) {
-      const result = await repository.releaseBloqueo(id);
+    async liberar(id, key) {
+      const result = await repository.releaseBloqueo(id, key);
       if (result === 'NO_ENCONTRADO')
         throw new AppError(
           404,

@@ -1,4 +1,4 @@
-name: Calidad y pruebas de Clientes
+name: Calidad e integracion de cuatro servicios
 on:
   push:
     branches: [main]
@@ -6,22 +6,55 @@ on:
 permissions:
   contents: read
 jobs:
-  clientes:
+  soa:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     services:
-      postgres:
+      clientes-postgres:
         image: postgres:17-bookworm
         env:
-          POSTGRES_USER: clientes
-          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_USER: clientes_ci
+          POSTGRES_PASSWORD: ci-clientes-only
           POSTGRES_DB: clientes_test
-        ports: ['5432:5432']
+        ports: ['5533:5432']
         options: >-
-          --health-cmd "pg_isready -U clientes -d clientes_test"
+          --health-cmd "pg_isready -U clientes_ci -d clientes_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      habitaciones-postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: habitaciones_ci
+          POSTGRES_PASSWORD: ci-habitaciones-only
+          POSTGRES_DB: habitaciones_test
+        ports: ['5534:5432']
+        options: >-
+          --health-cmd "pg_isready -U habitaciones_ci -d habitaciones_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      reservas-postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: reservas_ci
+          POSTGRES_PASSWORD: ci-reservas-only
+          POSTGRES_DB: reservas_test
+        ports: ['5535:5432']
+        options: >-
+          --health-cmd "pg_isready -U reservas_ci -d reservas_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      pagos-postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: pagos_ci
+          POSTGRES_PASSWORD: ci-pagos-only
+          POSTGRES_DB: pagos_test
+        ports: ['5536:5432']
+        options: >-
+          --health-cmd "pg_isready -U pagos_ci -d pagos_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://clientes:ci-only-password@127.0.0.1:5432/clientes_test
+      TEST_DATABASE_URL: postgresql://clientes_ci:ci-clientes-only@127.0.0.1:5533/clientes_test
+      TEST_HABITACIONES_DATABASE_URL: postgresql://habitaciones_ci:ci-habitaciones-only@127.0.0.1:5534/habitaciones_test
+      TEST_RESERVAS_DATABASE_URL: postgresql://reservas_ci:ci-reservas-only@127.0.0.1:5535/reservas_test
+      TEST_PAGOS_DATABASE_URL: postgresql://pagos_ci:ci-pagos-only@127.0.0.1:5536/pagos_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,12 +64,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm audit --prod --audit-level=high
-      - run: node scripts/setup-dev.mjs
+      - id: setup
+        run: node scripts/setup-dev.mjs
       - run: docker compose config --quiet
-      - run: docker compose up --build -d
-      - run: curl --fail --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:3001/health/ready
-      - run: node scripts/smoke.mjs
-      - if: failure()
-        run: docker compose logs --no-color
-      - if: always()
-        run: docker compose down
+      - run: docker compose up --build --wait --wait-timeout 180
+      - run: pnpm smoke
+      - if: failure() && steps.setup.outcome == 'success'
+        run: docker compose logs --no-color --tail=150
+      - if: always() && steps.setup.outcome == 'success'
+        run: docker compose down --remove-orphans

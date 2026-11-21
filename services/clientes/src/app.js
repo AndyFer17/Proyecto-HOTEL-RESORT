@@ -29,7 +29,10 @@ export async function createApp({
   app.disable('x-powered-by');
   app.use(helmet());
   app.use((req, res, next) => {
-    req.traceId = randomUUID();
+    const incoming = req.get('x-request-id');
+    req.traceId = idSchema.safeParse(incoming).success
+      ? incoming
+      : randomUUID();
     res.setHeader('X-Request-Id', req.traceId);
     res.setHeader('Cache-Control', 'no-store');
     const start = performance.now();
