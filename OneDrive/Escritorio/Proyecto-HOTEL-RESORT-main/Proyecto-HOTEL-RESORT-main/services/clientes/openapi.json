@@ -1,0 +1,788 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Hotel Resort - Clientes",
+    "version": "0.1.0",
+    "description": "Servicio implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Desarrollo local"
+    }
+  ],
+  "paths": {
+    "/api/v1/clientes": {
+      "post": {
+        "summary": "Registrar huésped",
+        "responses": {
+          "201": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "clienteId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "nombre": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "telefono": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rol": {
+                      "type": "string",
+                      "enum": ["HUESPED"]
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "clienteId",
+                    "nombre",
+                    "email",
+                    "telefono",
+                    "rol",
+                    "creadoEn"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Ruta del perfil creado",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Retry-After": {
+                "description": "Segundos hasta poder reintentar",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "telefono": {
+                    "type": "string",
+                    "pattern": "^\\+?[0-9 ()-]{7,25}$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128,
+                    "writeOnly": true
+                  }
+                },
+                "required": ["nombre", "email", "password"]
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Iniciar sesión",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "tokenType": {
+                      "type": "string",
+                      "enum": ["Bearer"]
+                    },
+                    "expiresIn": {
+                      "type": "integer",
+                      "example": 900
+                    }
+                  },
+                  "required": ["accessToken", "tokenType", "expiresIn"]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Retry-After": {
+                "description": "Segundos hasta poder reintentar",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "writeOnly": true
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/clientes/{id}": {
+      "get": {
+        "summary": "Consultar perfil propio",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "clienteId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "nombre": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "telefono": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rol": {
+                      "type": "string",
+                      "enum": ["HUESPED"]
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "clienteId",
+                    "nombre",
+                    "email",
+                    "telefono",
+                    "rol",
+                    "creadoEn"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Comprobar proceso",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "servicio": {
+                      "type": "string",
+                      "enum": ["clientes"]
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": ["OK"]
+                    }
+                  },
+                  "required": ["servicio", "estado"]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Comprobar persistencia y migración",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "servicio": {
+                      "type": "string",
+                      "enum": ["clientes"]
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": ["OK"]
+                    }
+                  },
+                  "required": ["servicio", "estado"]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "summary": "Obtener clave pública de firma",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kty": {
+                            "type": "string",
+                            "enum": ["RSA"]
+                          },
+                          "n": {
+                            "type": "string"
+                          },
+                          "e": {
+                            "type": "string"
+                          },
+                          "kid": {
+                            "type": "string"
+                          },
+                          "alg": {
+                            "type": "string",
+                            "enum": ["RS256"]
+                          },
+                          "use": {
+                            "type": "string",
+                            "enum": ["sig"]
+                          }
+                        },
+                        "required": ["kty", "n", "e", "kid", "alg", "use"]
+                      }
+                    }
+                  },
+                  "required": ["keys"]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Identificador de correlación generado",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["codigo", "mensaje", "detalle", "traceId"]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      }
+    }
+  }
+}

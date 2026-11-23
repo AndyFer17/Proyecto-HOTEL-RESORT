@@ -1,0 +1,555 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Hotel Resort - Reservas",
+    "version": "0.1.0",
+    "description": "BORRADOR: contrato preliminar. Servicio NO implementado. Errores uniformes y UUID. Los endpoints internos previstos requieren identidad de servicio independiente del JWT de huésped."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3003",
+      "description": "Desarrollo local - puerto futuro"
+    }
+  ],
+  "paths": {
+    "/api/v1/reservas": {
+      "post": {
+        "summary": "Crear reserva del huésped autenticado",
+        "responses": {
+          "201": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "reservaId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "huespedId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "habitacionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "hasta": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "PENDIENTE",
+                        "CONFIRMADA",
+                        "CANCELADA",
+                        "REQUIERE_REVISION"
+                      ]
+                    },
+                    "total": {
+                      "type": "string",
+                      "pattern": "^\\d{1,10}\\.\\d{2}$",
+                      "example": "660.00"
+                    },
+                    "moneda": {
+                      "type": "string",
+                      "enum": ["PEN"]
+                    }
+                  },
+                  "required": [
+                    "reservaId",
+                    "huespedId",
+                    "habitacionId",
+                    "desde",
+                    "hasta",
+                    "estado",
+                    "total",
+                    "moneda"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "huespedId se deriva del sub del JWT; total calculado por servidor. Coordina inventario y cargo con recuperación persistente.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "habitacionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "desde": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hasta": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "personas": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["habitacionId", "desde", "hasta", "personas"]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/reservas/{id}": {
+      "get": {
+        "summary": "Consultar reserva propia",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "reservaId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "huespedId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "habitacionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "hasta": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "PENDIENTE",
+                        "CONFIRMADA",
+                        "CANCELADA",
+                        "REQUIERE_REVISION"
+                      ]
+                    },
+                    "total": {
+                      "type": "string",
+                      "pattern": "^\\d{1,10}\\.\\d{2}$",
+                      "example": "660.00"
+                    },
+                    "moneda": {
+                      "type": "string",
+                      "enum": ["PEN"]
+                    }
+                  },
+                  "required": [
+                    "reservaId",
+                    "huespedId",
+                    "habitacionId",
+                    "desde",
+                    "hasta",
+                    "estado",
+                    "total",
+                    "moneda"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Cancelar reserva propia y coordinar liberación/anulación",
+        "responses": {
+          "204": {
+            "description": "Resultado correcto"
+          },
+          "400": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/interno/reservas/{id}/titular": {
+      "get": {
+        "summary": "Verificar titular y estado desde Pagos",
+        "responses": {
+          "200": {
+            "description": "Resultado correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "reservaId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "huespedId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "estado": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["reservaId", "huespedId", "estado"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error controlado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["codigo", "mensaje", "detalle", "traceId"]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      },
+      "serviceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token de identidad de servicio, emisión y scopes pendientes de acordar."
+      }
+    }
+  }
+}

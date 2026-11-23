@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS reservas (
+  id SERIAL PRIMARY KEY,
+  cliente_id VARCHAR(255) NOT NULL,
+  habitacion_id VARCHAR(255) NOT NULL,
+  fecha_inicio DATE NOT NULL,
+  fecha_fin DATE NOT NULL,
+  estado VARCHAR(50) DEFAULT 'PENDIENTE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
